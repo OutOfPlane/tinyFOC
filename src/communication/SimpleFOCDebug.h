@@ -2,7 +2,6 @@
 #ifndef __SIMPLEFOCDEBUG_H__
 #define __SIMPLEFOCDEBUG_H__
 
-#include "Arduino.h"
 
 
 /**

@@ -6,17 +6,17 @@
 /**
  *  Direction structure
  */
-enum Direction : int8_t {
-    CW      = 1,  // clockwise
-    CCW     = -1, // counter clockwise
-    UNKNOWN = 0   // not yet known or invalid state
+enum Direction {
+    Direction_CW      = 1,  // clockwise
+    Direction_CCW     = -1, // counter clockwise
+    Direction_UNKNOWN = 0   // not yet known or invalid state
 };
 
 
 /**
  *  Pullup configuration structure
  */
-enum Pullup : uint8_t {
+enum Pullup {
     USE_INTERN = 0x00, //!< Use internal pullups
     USE_EXTERN = 0x01  //!< Use external pullups
 };

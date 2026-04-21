@@ -1,7 +1,6 @@
 #ifndef BLDCMotor_h
 #define BLDCMotor_h
 
-#include "Arduino.h"
 #include "common/base_classes/FOCMotor.h"
 #include "common/base_classes/Sensor.h"
 #include "common/base_classes/FOCDriver.h"

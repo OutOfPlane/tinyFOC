@@ -1,7 +1,6 @@
 #ifndef FOCUTILS_LIB_H
 #define FOCUTILS_LIB_H
 
-#include "Arduino.h"
 
 // sign function
 #define _sign(a) ( ( (a) < 0 )  ?  -1   : ( (a) > 0 ) )
@@ -47,9 +46,9 @@ struct DQ_s
 };
 
 // dq voltage structs
-typedef DQ_s DQVoltage_s;
+typedef struct DQ_s DQVoltage_s;
 // dq current structs
-typedef DQ_s DQCurrent_s;
+typedef struct DQ_s DQCurrent_s;
 
 // alpha-beta variables    
 struct AB_s
@@ -57,8 +56,8 @@ struct AB_s
     float alpha;
     float beta;
 };
-typedef AB_s ABVoltage_s;  // NOT USED
-typedef AB_s ABCurrent_s;
+typedef struct AB_s ABVoltage_s;  // NOT USED
+typedef struct AB_s ABCurrent_s;
 
 // phase structs
 struct Phase_s
@@ -67,8 +66,8 @@ struct Phase_s
     float b;
     float c;
 };
-typedef Phase_s PhaseVoltage_s; // NOT USED
-typedef Phase_s PhaseCurrent_s;
+typedef struct Phase_s PhaseVoltage_s; // NOT USED
+typedef struct Phase_s PhaseCurrent_s;
 
 
 /**
@@ -120,5 +119,10 @@ float _electricalAngle(float shaft_angle, int pole_pairs);
  * @param value - number
  */
 float _sqrtApprox(float value);
+
+typedef struct{
+    void (*write)(char* val);
+    int (*read)(char* val, int len);
+}Print;
 
 #endif

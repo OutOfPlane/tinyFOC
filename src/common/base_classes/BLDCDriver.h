@@ -1,7 +1,6 @@
 #ifndef BLDCDRIVER_H
 #define BLDCDRIVER_H
 
-#include "Arduino.h"
 #include "FOCDriver.h"
 
 class BLDCDriver: public FOCDriver{
