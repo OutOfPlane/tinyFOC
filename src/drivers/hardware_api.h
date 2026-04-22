@@ -4,7 +4,7 @@
 #include "../common/foc_utils.h"
 #include "../common/time_utils.h"
 #include "../communication/SimpleFOCDebug.h"
-#include "../common/base_classes/BLDCDriver.h"
+#include "../common/base_classes/FOCDriver.h"
 
 
 // these defines determine the polarity of the PWM output. Normally, the polarity is active-high,
@@ -37,6 +37,16 @@ typedef struct GenericDriverParams {
   long pwm_frequency;
   float dead_zone;
 } GenericDriverParams;
+
+enum pinMode{
+  INPUT,
+  INPUT_PULLUP,
+  INPUT_PULLDOWN,
+  OUTPUT,
+  ANALOG
+};
+
+void _pinMode(int pin, enum pinMode mode);
 
 
 /** 
@@ -171,7 +181,7 @@ void _writeDutyCycle4PWM(float dc_1a,  float dc_1b, float dc_2a, float dc_2b, vo
  * @param params  the driver parameters
  * 
  */ 
-void _writeDutyCycle6PWM(float dc_a,  float dc_b, float dc_c, PhaseState *phase_state, void* params);
+void _writeDutyCycle6PWM(float dc_a,  float dc_b, float dc_c, enum PhaseState *phase_state, void* params);
 
 
 #endif

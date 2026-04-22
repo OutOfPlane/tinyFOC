@@ -121,7 +121,10 @@ float _electricalAngle(float shaft_angle, int pole_pairs);
 float _sqrtApprox(float value);
 
 typedef struct{
-    void (*write)(char* val);
+    void (*write)(char val);
+    void (*newline)(void);
+    void (*print)(char* msg);
+    void (*print_f)(float val, int digits);
     int (*read)(char* val, int len);
 }Print;
 

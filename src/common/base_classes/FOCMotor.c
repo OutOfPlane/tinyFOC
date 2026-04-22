@@ -51,7 +51,7 @@ float default_shaftAngle(FOCMotor *motor)
     // if no sensor linked return previous value ( for open loop )
     if (!motor->sensor)
         return motor->shaft_angle;
-    return motor->sensor_direction * motor->sensor->getAngle() - motor->sensor_offset;
+    return motor->sensor_direction * motor->sensor->getAngle(motor->sensor) - motor->sensor_offset;
 }
 
 // shaft velocity calculation
@@ -60,7 +60,7 @@ float default_shaftVelocity(FOCMotor *motor)
     // if no sensor linked return previous value ( for open loop )
     if (!motor->sensor)
         return motor->shaft_velocity;
-    return motor->sensor_direction * LPF_velocity(motor->sensor->getVelocity());
+    return motor->sensor_direction * LPF_velocity(motor->sensor->getVelocity(motor->sensor));
 }
 
 float default_electricalAngle(FOCMotor *motor)
@@ -68,7 +68,7 @@ float default_electricalAngle(FOCMotor *motor)
     // if no sensor linked return previous value ( for open loop )
     if (!motor->sensor)
         return motor->electrical_angle;
-    return _normalizeAngle((float)(motor->sensor_direction * motor->pole_pairs) * motor->sensor->getMechanicalAngle() - motor->zero_electric_angle);
+    return _normalizeAngle((float)(motor->sensor_direction * motor->pole_pairs) * motor->sensor->getMechanicalAngle(motor->sensor) - motor->zero_electric_angle);
 }
 
 /**
@@ -108,20 +108,20 @@ int default_characteriseMotor(FOCMotor *motor, float voltage, float correction_f
     motor->setPhaseVoltage(motor, 0, 0, current_electric_angle);
     _delay(500);
 
-    PhaseCurrent_s zerocurrent_raw = motor->current_sense->readAverageCurrents();
-    DQCurrent_s zerocurrent = motor->current_sense->getDQCurrents(current_sense->getABCurrents(zerocurrent_raw), current_electric_angle);
+    PhaseCurrent_s zerocurrent_raw = CurrentSense_readAverageCurrents(motor->current_sense, CURRENT_SENSE_N);
+    DQCurrent_s zerocurrent = CurrentSense_getDQCurrents(motor->current_sense, CurrentSense_getABCurrents(motor->current_sense, zerocurrent_raw), current_electric_angle);
 
     // Ramp and hold the voltage to measure resistance
     // 300 ms of ramping
-    current_electric_angle = motor->electricalAngle();
+    current_electric_angle = motor->electricalAngle(motor);
     for (int i = 0; i < 100; i++)
     {
         motor->setPhaseVoltage(motor, 0, voltage / 100.0 * ((float)i), current_electric_angle);
         _delay(3);
     }
     _delay(10);
-    PhaseCurrent_s r_currents_raw = motor->current_sense->readAverageCurrents();
-    DQCurrent_s r_currents = motor->current_sense->getDQCurrents(motor->current_sense->getABCurrents(*r_currents_raw), current_electric_angle);
+    PhaseCurrent_s r_currents_raw = CurrentSense_readAverageCurrents(motor->current_sense, CURRENT_SENSE_N);
+    DQCurrent_s r_currents = CurrentSense_getDQCurrents(motor->current_sense, CurrentSense_getABCurrents(motor->current_sense, zerocurrent_raw), current_electric_angle);
 
     // Zero again
     motor->setPhaseVoltage(motor, 0, 0, current_electric_angle);
@@ -173,19 +173,19 @@ int default_characteriseMotor(FOCMotor *motor, float voltage, float correction_f
             for (size_t j = 0; j < cycles; j++)
             {
                 // read zero current
-                zerocurrent_raw = motor->current_sense->readAverageCurrents(20);
-                zerocurrent = motor->current_sense->getDQCurrents(current_sense->getABCurrents(zerocurrent_raw), current_electric_angle);
+                zerocurrent_raw = CurrentSense_readAverageCurrents(motor->current_sense, 20);
+                zerocurrent = CurrentSense_getDQCurrents(motor->current_sense, CurrentSense_getABCurrents(motor->current_sense, zerocurrent_raw), current_electric_angle);
 
                 // step the voltage
                 motor->setPhaseVoltage(motor, 0, voltage, current_electric_angle);
                 t0 = _micros();
                 delayMicroseconds(risetime_us); // wait a little bit
 
-                PhaseCurrent_s l_currents_raw = motor->current_sense->getPhaseCurrents();
+                PhaseCurrent_s l_currents_raw = motor->current_sense->getPhaseCurrents(motor->current_sense);
                 t1 = _micros();
                 motor->setPhaseVoltage(motor, 0, 0, current_electric_angle);
 
-                DQCurrent_s l_currents = motor->current_sense->getDQCurrents(motor->current_sense->getABCurrents(l_currents_raw), current_electric_angle);
+                DQCurrent_s l_currents = CurrentSense_getDQCurrents(motor->current_sense, CurrentSense_getABCurrents(motor->current_sense, l_currents_raw), current_electric_angle);
                 delayMicroseconds(settle_us); // wait a bit for the currents to go to 0 again
 
                 if (t0 > t1)
@@ -270,8 +270,8 @@ int default_characteriseMotor(FOCMotor *motor, float voltage, float correction_f
          * We then report the one closest to the actual value. This could be useful if the zero search method is not reliable enough (eg. high pole count).
          */
 
-        float estimated_zero_electric_angle_A = _normalizeAngle((float)(motor->sensor_direction * motor->pole_pairs) * motor->sensor->getMechanicalAngle() - d_electrical_angle);
-        float estimated_zero_electric_angle_B = _normalizeAngle((float)(motor->sensor_direction * motor->pole_pairs) * motor->sensor->getMechanicalAngle() - d_electrical_angle + _PI);
+        float estimated_zero_electric_angle_A = _normalizeAngle((float)(motor->sensor_direction * motor->pole_pairs) * motor->sensor->getMechanicalAngle(motor->sensor) - d_electrical_angle);
+        float estimated_zero_electric_angle_B = _normalizeAngle((float)(motor->sensor_direction * motor->pole_pairs) * motor->sensor->getMechanicalAngle(motor->sensor) - d_electrical_angle + _PI);
         float estimated_zero_electric_angle = 0.0f;
         if (fabsf(estimated_zero_electric_angle_A - motor->zero_electric_angle) < fabsf(estimated_zero_electric_angle_B - motor->zero_electric_angle))
         {
@@ -319,26 +319,26 @@ void default_monitor(FOCMotor *motor)
     if (motor->monitor_variables & _MON_TARGET)
     {
         if (!printed && motor->monitor_start_char)
-            motor->monitor_port->print(motor->monitor_start_char);
-        motor->monitor_port->print(motor->target, motor->monitor_decimals);
+            motor->monitor_port->write(motor->monitor_start_char);
+        motor->monitor_port->print_f(motor->target, motor->monitor_decimals);
         printed = true;
     }
     if (motor->monitor_variables & _MON_VOLT_Q)
     {
         if (!printed && motor->monitor_start_char)
-            motor->monitor_port->print(motor->monitor_start_char);
+            motor->monitor_port->write(motor->monitor_start_char);
         else if (printed)
-            motor->monitor_port->print(motor->monitor_separator);
-        motor->monitor_port->print(motor->voltage.q, motor->monitor_decimals);
+            motor->monitor_port->write(motor->monitor_separator);
+        motor->monitor_port->print_f(motor->voltage.q, motor->monitor_decimals);
         printed = true;
     }
     if (motor->monitor_variables & _MON_VOLT_D)
     {
         if (!printed && motor->monitor_start_char)
-            motor->monitor_port->print(motor->monitor_start_char);
+            motor->monitor_port->write(motor->monitor_start_char);
         else if (printed)
-            motor->monitor_port->print(motor->monitor_separator);
-        motor->monitor_port->print(motor->voltage.d, motor->monitor_decimals);
+            motor->monitor_port->write(motor->monitor_separator);
+        motor->monitor_port->print_f(motor->voltage.d, motor->monitor_decimals);
         printed = true;
     }
     // read currents if possible - even in voltage mode (if current_sense available)
@@ -347,26 +347,27 @@ void default_monitor(FOCMotor *motor)
         DQCurrent_s c = motor->current;
         if (motor->current_sense && motor->torque_controller != TorqueControlType_foc_current)
         {
-            c = motor->current_sense->getFOCCurrents(motor->electrical_angle);
-            c.q = LPF_current_q(c.q);
-            c.d = LPF_current_d(c.d);
+            
+            c = CurrentSense_getFOCCurrents(motor->current_sense, motor->electrical_angle);
+            c.q = LowPassFilter_update(&(motor->LPF_current_q), c.q);
+            c.d = LowPassFilter_update(&(motor->LPF_current_d), c.d);
         }
         if (motor->monitor_variables & _MON_CURR_Q)
         {
             if (!printed && motor->monitor_start_char)
-                motor->monitor_port->print(motor->monitor_start_char);
+                motor->monitor_port->write(motor->monitor_start_char);
             else if (printed)
-                motor->monitor_port->print(motor->monitor_separator);
-            motor->monitor_port->print(c.q * 1000, motor->monitor_decimals); // mAmps
+                motor->monitor_port->write(motor->monitor_separator);
+            motor->monitor_port->print_f(c.q * 1000, motor->monitor_decimals); // mAmps
             printed = true;
         }
         if (motor->monitor_variables & _MON_CURR_D)
         {
             if (!printed && motor->monitor_start_char)
-                motor->monitor_port->print(motor->monitor_start_char);
+                motor->monitor_port->write(motor->monitor_start_char);
             else if (printed)
-                motor->monitor_port->print(motor->monitor_separator);
-            motor->monitor_port->print(c.d * 1000, motor->monitor_decimals); // mAmps
+                motor->monitor_port->write(motor->monitor_separator);
+            motor->monitor_port->print_f(c.d * 1000, motor->monitor_decimals); // mAmps
             printed = true;
         }
     }
@@ -374,27 +375,30 @@ void default_monitor(FOCMotor *motor)
     if (motor->monitor_variables & _MON_VEL)
     {
         if (!printed && motor->monitor_start_char)
-            motor->monitor_port->print(motor->monitor_start_char);
+            motor->monitor_port->write(motor->monitor_start_char);
         else if (printed)
-            motor->monitor_port->print(motor->monitor_separator);
-        motor->monitor_port->print(motor->shaft_velocity, motor->monitor_decimals);
+            motor->monitor_port->write(motor->monitor_separator);
+        motor->monitor_port->print_f(motor->shaft_velocity, motor->monitor_decimals);
         printed = true;
     }
     if (motor->monitor_variables & _MON_ANGLE)
     {
         if (!printed && motor->monitor_start_char)
-            motor->monitor_port->print(motor->monitor_start_char);
+            motor->monitor_port->write(motor->monitor_start_char);
         else if (printed)
-            motor->monitor_port->print(motor->monitor_separator);
-        motor->monitor_port->print(motor->shaft_angle, motor->monitor_decimals);
+            motor->monitor_port->write(motor->monitor_separator);
+        motor->monitor_port->print_f(motor->shaft_angle, motor->monitor_decimals);
         printed = true;
     }
     if (printed)
     {
         if (motor->monitor_end_char)
-            motor->monitor_port->println(motor->monitor_end_char);
+        {
+            motor->monitor_port->write(motor->monitor_end_char);
+            motor->monitor_port->newline();
+        }
         else
-            motor->monitor_port->println("");
+            motor->monitor_port->newline();
     }
 }
 
@@ -698,7 +702,7 @@ void FOCMotor_loopFOC(FOCMotor *motor)
     // update sensor - do this even in open-loop mode, as user may be switching between modes and we could lose track
     //                 of full rotations otherwise.
     if (motor->sensor)
-        motor->sensor->update();
+        motor->sensor->update(motor->sensor);
 
     // if disabled do nothing
     if (!motor->enabled)
@@ -729,7 +733,7 @@ void FOCMotor_loopFOC(FOCMotor *motor)
         if (_isset(motor->KV_rating))
             motor->voltage_bemf = motor->estimateBEMF(motor, motor->shaft_velocity);
         // filter the value values
-        motor->current.q = LPF_current_q(motor->current_sp);
+        motor->current.q = LowPassFilter_update(&(motor->LPF_current_q), motor->current_sp);
         // calculate the phase voltage
         motor->voltage.q = motor->current.q * motor->phase_resistance + motor->voltage_bemf;
         // constrain voltage within limits
@@ -746,11 +750,11 @@ void FOCMotor_loopFOC(FOCMotor *motor)
         // constrain current setpoint
         motor->current_sp = _constrain(motor->current_sp, -motor->current_limit, motor->current_limit) + motor->feed_forward_current.q;
         // read overall current magnitude
-        motor->current.q = motor->current_sense->getDCCurrent(motor->electrical_angle);
+        motor->current.q = motor->current_sense->getDCCurrent(motor->current_sense, motor->electrical_angle);
         // filter the value values
-        motor->current.q = LPF_current_q(motor->current.q);
+        motor->current.q = LowPassFilter_update(&(motor->LPF_current_q), motor->current.q);
         // calculate the phase voltage
-        motor->voltage.q = PID_current_q(motor->current_sp - motor->current.q) + motor->feed_forward_voltage.q;
+        motor->voltage.q = PIDController_update(&(motor->PID_current_q), motor->current_sp - motor->current.q) + motor->feed_forward_voltage.q;
         // d voltage  - lag compensation
         if (_isset(motor->axis_inductance.q))
             motor->voltage.d = _constrain(-motor->current_sp * motor->shaft_velocity * motor->pole_pairs * motor->axis_inductance.q, -motor->voltage_limit, motor->voltage_limit) + motor->feed_forward_voltage.d;
@@ -763,13 +767,13 @@ void FOCMotor_loopFOC(FOCMotor *motor)
         // constrain current setpoint
         motor->current_sp = _constrain(motor->current_sp, -motor->current_limit, motor->current_limit) + motor->feed_forward_current.q;
         // read dq currents
-        motor->current = motor->current_sense->getFOCCurrents(motor->electrical_angle);
+        motor->current = CurrentSense_getFOCCurrents(motor->current_sense, motor->electrical_angle);
         // filter values
-        motor->current.q = LPF_current_q(motor->current.q);
-        motor->current.d = LPF_current_d(motor->current.d);
+        motor->current.q = LowPassFilter_update(&(motor->LPF_current_q), motor->current.q);
+        motor->current.d = LowPassFilter_update(&(motor->LPF_current_d), motor->current.d);
         // calculate the phase voltages
-        motor->voltage.q = PID_current_q(motor->current_sp - motor->current.q);
-        motor->voltage.d = PID_current_d(motor->feed_forward_current.d - motor->current.d);
+        motor->voltage.q = PIDController_update(&(motor->PID_current_q), motor->current_sp - motor->current.q);
+        motor->voltage.d = PIDController_update(&(motor->PID_current_d), motor->feed_forward_current.d - motor->current.d);
         // d voltage - lag compensation
         if (_isset(motor->axis_inductance.q))
             motor->voltage.d = _constrain(motor->voltage.d - motor->current_sp * motor->shaft_velocity * motor->pole_pairs * motor->axis_inductance.q, -motor->voltage_limit, motor->voltage_limit);
@@ -798,7 +802,7 @@ void FOCMotor_move(FOCMotor *motor, float new_target)
 {
 
     // set internal target variable
-    if (_isset(motor->new_target))
+    if (_isset(new_target))
         motor->target = new_target;
 
     // downsampling (optional)
@@ -850,7 +854,7 @@ void FOCMotor_move(FOCMotor *motor, float new_target)
         // angle set point
         motor->shaft_angle_sp = motor->target;
         // calculate the torque command - sensor precision: this calculation is ok, but based on bad value from previous calculation
-        motor->current_sp = P_angle(motor->shaft_angle_sp - LPF_angle(motor->shaft_angle));
+        motor->current_sp = PIDController_update(&(motor->P_angle), motor->shaft_angle_sp - LPF_angle(motor->shaft_angle));
         break;
     case MotionControlType_angle:
         // TODO sensor precision: this calculation is not numerically precise. The target value cannot express precise positions when
@@ -859,16 +863,16 @@ void FOCMotor_move(FOCMotor *motor, float new_target)
         // angle set point
         motor->shaft_angle_sp = motor->target;
         // calculate velocity set point
-        motor->shaft_velocity_sp = motor->feed_forward_velocity + P_angle(motor->shaft_angle_sp - LPF_angle(motor->shaft_angle));
+        motor->shaft_velocity_sp = motor->feed_forward_velocity + PIDController_update(&(motor->P_angle), motor->shaft_angle_sp - LPF_angle(motor->shaft_angle));
         motor->shaft_velocity_sp = _constrain(motor->shaft_velocity_sp, -motor->velocity_limit, motor->velocity_limit);
         // calculate the torque command - sensor precision: this calculation is ok, but based on bad value from previous calculation
-        motor->current_sp = PID_velocity(motor->shaft_velocity_sp - motor->shaft_velocity);
+        motor->current_sp = PIDController_update(&(motor->PID_velocity), motor->shaft_velocity_sp - motor->shaft_velocity);
         break;
     case MotionControlType_velocity:
         // velocity set point - sensor precision: this calculation is numerically precise.
         motor->shaft_velocity_sp = motor->target;
         // calculate the torque command
-        motor->current_sp = PID_velocity(motor->shaft_velocity_sp - motor->shaft_velocity);
+        motor->current_sp = PIDController_update(&(motor->PID_velocity), motor->shaft_velocity_sp - motor->shaft_velocity);
         break;
     case MotionControlType_velocity_openloop:
         // velocity control in open loop - sensor precision: this calculation is numerically precise.
@@ -914,7 +918,7 @@ int FOCMotor_initFOC(FOCMotor *motor)
     {
         exit_flag *= FOCMotor_alignSensor(motor);
         // added the shaft_angle update
-        motor->sensor->update();
+        motor->sensor->update(motor->sensor);
         motor->shaft_angle = motor->shaftAngle(motor);
     }
     else
@@ -978,7 +982,7 @@ int FOCMotor_alignCurrentSense(FOCMotor *motor)
     SIMPLEFOC_MOTOR_DEBUG("Align current sense.");
 
     // align current sense and the driver
-    exit_flag = motor->current_sense->driverAlign(motor->voltage_sensor_align, motor->modulation_centered);
+    exit_flag = motor->current_sense->driverAlign(motor->current_sense, motor->voltage_sensor_align, motor->modulation_centered);
     if (!exit_flag)
     {
         // error in current sense - phase either not measured or bad connection
@@ -1001,7 +1005,7 @@ int FOCMotor_alignSensor(FOCMotor *motor)
     SIMPLEFOC_MOTOR_DEBUG("Align sensor.");
 
     // check if sensor needs zero search
-    if (motor->sensor->needsSearch())
+    if (motor->sensor->needsSearch(motor->sensor))
         exit_flag = FOCMotor_absoluteZeroSearch(motor);
     // stop init if not found index
     if (!exit_flag)
@@ -1021,22 +1025,22 @@ int FOCMotor_alignSensor(FOCMotor *motor)
         {
             float angle = _3PI_2 + _2PI * i / 500.0f;
             motor->setPhaseVoltage(motor, voltage_align, 0, angle);
-            motor->sensor->update();
+            motor->sensor->update(motor->sensor);
             _delay(2);
         }
         // take and angle in the middle
-        motor->sensor->update();
-        float mid_angle = motor->sensor->getAngle();
+        motor->sensor->update(motor->sensor);
+        float mid_angle = motor->sensor->getAngle(motor->sensor);
         // move one electrical revolution backwards
         for (int i = 500; i >= 0; i--)
         {
             float angle = _3PI_2 + _2PI * i / 500.0f;
             motor->setPhaseVoltage(motor, voltage_align, 0, angle);
-            motor->sensor->update();
+            motor->sensor->update(motor->sensor);
             _delay(2);
         }
-        motor->sensor->update();
-        float end_angle = motor->sensor->getAngle();
+        motor->sensor->update(motor->sensor);
+        float end_angle = motor->sensor->getAngle(motor->sensor);
         // setPhaseVoltage(0, 0, 0);
         _delay(200);
         // determine the direction the sensor moved
@@ -1078,7 +1082,7 @@ int FOCMotor_alignSensor(FOCMotor *motor)
         motor->setPhaseVoltage(motor, voltage_align, 0, _3PI_2);
         _delay(700);
         // read the sensor
-        motor->sensor->update();
+        motor->sensor->update(motor->sensor);
         // get the current zero electric angle
         motor->zero_electric_angle = 0;
         motor->zero_electric_angle = motor->electricalAngle(motor);
@@ -1108,12 +1112,12 @@ int FOCMotor_absoluteZeroSearch(FOCMotor *motor)
     motor->velocity_limit = motor->velocity_index_search;
     motor->voltage_limit = motor->voltage_sensor_align;
     motor->shaft_angle = 0;
-    while (motor->sensor->needsSearch() && motor->shaft_angle < _2PI)
+    while (motor->sensor->needsSearch(motor->sensor) && motor->shaft_angle < _2PI)
     {
         FOCMotor_angleOpenloop(motor, 1.5f * _2PI);
         // call important for some sensors not to loose count
         // not needed for the search
-        motor->sensor->update();
+        motor->sensor->update(motor->sensor);
     }
     // disable motor
     motor->setPhaseVoltage(motor, 0, 0, 0);
@@ -1123,7 +1127,7 @@ int FOCMotor_absoluteZeroSearch(FOCMotor *motor)
     // check if the zero found
     if (motor->monitor_port)
     {
-        if (motor->sensor->needsSearch())
+        if (motor->sensor->needsSearch(motor->sensor))
         {
             SIMPLEFOC_MOTOR_ERROR("Not found!");
         }
@@ -1132,5 +1136,5 @@ int FOCMotor_absoluteZeroSearch(FOCMotor *motor)
             SIMPLEFOC_MOTOR_DEBUG("Success!");
         }
     }
-    return !motor->sensor->needsSearch();
+    return !motor->sensor->needsSearch(motor->sensor);
 }

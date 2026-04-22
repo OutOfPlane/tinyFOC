@@ -16,6 +16,8 @@
 #define MOT_WARN "WARN-MOT:"
 #define MOT_DEBUG "MOT:"
 
+#define SIMPLEFOC_DISABLE_DEBUG
+
 #ifndef SIMPLEFOC_DISABLE_DEBUG
 #define SIMPLEFOC_MOTOR_WARN(msg, ...)  \
       SimpleFOCDebug::print(MOT_WARN); \
@@ -313,6 +315,8 @@ typedef struct s_FOCMotor{
   float (*customMotionControlCallback)(struct s_FOCMotor *motor);
 
 } FOCMotor;
+
+void FOCMotor_load_default(FOCMotor *motor);
 
 
 /**

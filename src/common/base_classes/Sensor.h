@@ -41,15 +41,13 @@ enum Pullup {
  * optimal implementations for your hardware.
  * 
  */
-class Sensor{
-	friend class SmoothingSensor;
-    public:
+typedef struct s_Sensor{
         /**
          * Get mechanical shaft angle in the range 0 to 2PI. This value will be as precise as possible with
          * the hardware. Base implementation uses the values returned by update() so that 
          * the same values are returned until update() is called again.
          */
-        virtual float getMechanicalAngle();
+        float (*getMechanicalAngle)(struct s_Sensor *sns);
 
         /**
          * Get current position (in rad) including full rotations and shaft angle.
@@ -59,7 +57,7 @@ class Sensor{
          * because the limited precision of float can't capture the large angle of the full 
          * rotations and the small angle of the shaft angle at the same time.
          */
-        virtual float getAngle();
+        float (*getAngle)(struct s_Sensor *sns);
         
         /** 
          * On architectures supporting it, this will return a double precision position value,
@@ -67,7 +65,7 @@ class Sensor{
          * Base implementation uses the values returned by update() so that the same
          * values are returned until update() is called again.
          */
-        virtual double getPreciseAngle();
+        double (*getPreciseAngle)(struct s_Sensor *sns);
 
         /** 
          * Get current angular velocity (rad/s)
@@ -75,14 +73,14 @@ class Sensor{
          * returned by update() so that it only makes sense to call this if update()
          * has been called in the meantime.
          */
-        virtual float getVelocity();
+        float (*getVelocity)(struct s_Sensor *sns);
 
         /**
          * Get the number of full rotations
          * Base implementation uses the values returned by update() so that the same
          * values are returned until update() is called again. 
          */
-        virtual int32_t getFullRotations();
+        int32_t (*getFullRotations)(struct s_Sensor *sns);
 
         /**
          * Updates the sensor values by reading the hardware sensor.
@@ -94,21 +92,20 @@ class Sensor{
          * Override in subclasses if alternative behaviours are required for your
          * sensor hardware.
          */
-        virtual void update();
+        void (*update)(struct s_Sensor *sns);
 
         /** 
          * returns 0 if it does need search for absolute zero
          * 0 - magnetic sensor (& encoder with index which is found)
          * 1 - ecoder with index (with index not found yet)
          */
-        virtual int needsSearch();
+        int (*needsSearch)(struct s_Sensor *sns);
 
         /**
          * Minimum time between updates to velocity. If time elapsed is lower than this, the velocity is not updated.
          */
-        float min_elapsed_time = 0.000100; // default is 100 microseconds, or 10kHz
+        float min_elapsed_time; // default is 100 microseconds, or 10kHz
 
-    protected:
         /** 
          * Get current shaft angle from the sensor hardware, and 
          * return it as a float in radians, in the range 0 to 2PI.
@@ -117,23 +114,25 @@ class Sensor{
          * Calling this method directly does not update the base-class internal fields.
          * Use update() when calling from outside code.
          */
-        virtual float getSensorAngle()=0;
+        float (*getSensorAngle)(struct s_Sensor *sns);
         /**
          * Call Sensor::init() from your sensor subclass's init method if you want smoother startup
          * The base class init() method calls getSensorAngle() several times to initialize the internal fields
          * to current values, ensuring there is no discontinuity ("jump from zero") during the first calls
          * to sensor.getAngle() and sensor.getVelocity()
          */
-        virtual void init();
+        void (*init)(struct s_Sensor *sns);
 
         // velocity calculation variables
-        float velocity=0.0f;
-        float angle_prev=0.0f; // result of last call to getSensorAngle(), used for full rotations and velocity
-        long angle_prev_ts=0; // timestamp of last call to getAngle, used for velocity
-        float vel_angle_prev=0.0f; // angle at last call to getVelocity, used for velocity
-        long vel_angle_prev_ts=0; // last velocity calculation timestamp
-        int32_t full_rotations=0; // full rotation tracking
-        int32_t vel_full_rotations=0; // previous full rotation value for velocity calculation
-};
+        float velocity;
+        float angle_prev; // result of last call to getSensorAngle(), used for full rotations and velocity
+        long angle_prev_ts; // timestamp of last call to getAngle, used for velocity
+        float vel_angle_prev; // angle at last call to getVelocity, used for velocity
+        long vel_angle_prev_ts; // last velocity calculation timestamp
+        int32_t full_rotations; // full rotation tracking
+        int32_t vel_full_rotations; // previous full rotation value for velocity calculation
+}Sensor;
+
+void Sensor_load_default(Sensor *sns);
 
 #endif

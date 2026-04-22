@@ -4,37 +4,78 @@
 #include "FOCDriver.h"
 #include "../foc_utils.h"
 #include "../time_utils.h"
-#include "StepperDriver.h"
-#include "BLDCDriver.h"
 
 /**
  *  Current sensing abstract class defintion
  * Each current sensing implementation needs to extend this interface
  */
-class CurrentSense{
-    public:
 
+ #define CURRENT_SENSE_N 100
+ #define CURRENT_SENSE_MOD_CENTERED false
+typedef struct s_CurrentSense{
     /**
      *  Function intialising the CurrentSense class
      *   - All the necessary intialisations of adc and sync should be implemented here
      *   
      * @returns -  0 - for failure &  1 - for success 
      */
-    virtual int init() = 0;
-    
+    int (*init)(struct s_CurrentSense *cs);
+
     /**
-     * Linking the current sense with the motor driver
-     * Only necessary if synchronisation in between the two is required
+     * Function intended to verify if:
+     *   - phase current are oriented properly 
+     *   - if their order is the same as driver phases
+     * 
+     * This function corrects the alignment errors if possible ans if no such thing is needed it can be left empty (return 1)
+     * @returns -  
+            0 - failure
+            1 - success and nothing changed
+            2 - success but pins reconfigured
+            3 - success but gains inverted
+            4 - success but pins reconfigured and gains inverted
+     * 
+     * IMPORTANT: Default implementation provided in the CurrentSense class, but can be overriden in the child classes
      */
-    void linkDriver(FOCDriver *driver);
+    int (*driverAlign)(struct s_CurrentSense *cs, float align_voltage, bool modulation_centered);
+
+    /**
+     *  Function rading the phase currents a, b and c
+     *   This function will be used with the foc control throught the function 
+     *   CurrentSense::getFOCCurrents(electrical_angle)
+     *   - it returns current c equal to 0 if only two phase measurements available
+     * 
+     *  @return PhaseCurrent_s current values
+     */
+    PhaseCurrent_s (*getPhaseCurrents)(struct s_CurrentSense *cs);
+    /**
+     * Function reading the magnitude of the current set to the motor
+     *  It returns the absolute or signed magnitude if possible
+     *  It can receive the motor electrical angle to help with calculation
+     *  This function is used with the current control  (not foc)
+     *  
+     * @param angle_el - electrical angle of the motor (optional) 
+     */
+    float (*getDCCurrent)(struct s_CurrentSense *cs, float angle_el);
+
+    /**
+     * enable the current sense. default implementation does nothing, but you can
+     * override it to do something useful.
+     */
+    void (*enable)(struct s_CurrentSense *cs);
+
+    /**
+     * disable the current sense. default implementation does nothing, but you can
+     * override it to do something useful.
+     */
+    void (*disable)(struct s_CurrentSense *cs);
 
     // variables
-    bool skip_align = false; //!< variable signaling that the phase current direction should be verified during initFOC()
+    bool skip_align; //!< variable signaling that the phase current direction should be verified during initFOC()
     
-    FOCDriver* driver = nullptr; //!< driver link
-    bool initialized = false; // true if current sense was successfully initialized   
-    void* params = 0; //!< pointer to hardware specific parameters of current sensing
-    DriverType driver_type = DriverType::UnknownDriver; //!< driver type (BLDC or Stepper)
+    FOCDriver* driver; //!< driver link
+    bool initialized; // true if current sense was successfully initialized   
+    void* params; //!< pointer to hardware specific parameters of current sensing
+    enum DriverType driver_type; //!< driver type (BLDC or Stepper)
     
     
     // ADC measurement gain for each phase
@@ -53,98 +94,59 @@ class CurrentSense{
   	int pinB; //!< pin B analog pin for current measurement
   	int pinC; //!< pin C analog pin for current measurement
 
-    /**
-     * Function intended to verify if:
-     *   - phase current are oriented properly 
-     *   - if their order is the same as driver phases
-     * 
-     * This function corrects the alignment errors if possible ans if no such thing is needed it can be left empty (return 1)
-     * @returns -  
-            0 - failure
-            1 - success and nothing changed
-            2 - success but pins reconfigured
-            3 - success but gains inverted
-            4 - success but pins reconfigured and gains inverted
-     * 
-     * IMPORTANT: Default implementation provided in the CurrentSense class, but can be overriden in the child classes
-     */
-    virtual int driverAlign(float align_voltage, bool modulation_centered = false);
+} CurrentSense;
 
-    /**
-     *  Function rading the phase currents a, b and c
-     *   This function will be used with the foc control throught the function 
-     *   CurrentSense::getFOCCurrents(electrical_angle)
-     *   - it returns current c equal to 0 if only two phase measurements available
-     * 
-     *  @return PhaseCurrent_s current values
-     */
-    virtual PhaseCurrent_s getPhaseCurrents() = 0;
-    /**
-     * Function reading the magnitude of the current set to the motor
-     *  It returns the absolute or signed magnitude if possible
-     *  It can receive the motor electrical angle to help with calculation
-     *  This function is used with the current control  (not foc)
-     *  
-     * @param angle_el - electrical angle of the motor (optional) 
-     */
-    virtual float getDCCurrent(float angle_el = 0);
+void CurrentSense_load_default(CurrentSense *cs);
 
-    /**
-     * Function used for FOC control, it reads the DQ currents of the motor 
-     *   It uses the function getPhaseCurrents internally
-     * 
-     * @param angle_el - motor electrical angle
-     */
-    DQCurrent_s getFOCCurrents(float angle_el);
+/**
+ * Linking the current sense with the motor driver
+ * Only necessary if synchronisation in between the two is required
+ */
+void CurrentSense_linkDriver(CurrentSense *cs, FOCDriver *driver);
 
-    /**
-     * Function used for Clarke transform in FOC control
-     *   It reads the phase currents of the motor 
-     *   It returns the alpha and beta currents
-     * 
-     * @param current - phase current
-     */
-    ABCurrent_s getABCurrents(PhaseCurrent_s current);
+/**
+ * Function used for FOC control, it reads the DQ currents of the motor 
+ *   It uses the function getPhaseCurrents internally
+ * 
+ * @param angle_el - motor electrical angle
+ */
+DQCurrent_s CurrentSense_getFOCCurrents(CurrentSense *cs, float angle_el);
 
-    /**
-     * Function used for Park transform in FOC control
-     *   It reads the Alpha Beta currents and electrical angle of the motor 
-     *   It returns the D and Q currents
-     * 
-     * @param current - phase current
-     */
-    DQCurrent_s getDQCurrents(ABCurrent_s current,float angle_el);
+/**
+ * Function used for Clarke transform in FOC control
+ *   It reads the phase currents of the motor 
+ *   It returns the alpha and beta currents
+ * 
+ * @param current - phase current
+ */
+ABCurrent_s CurrentSense_getABCurrents(CurrentSense *cs, PhaseCurrent_s current);
 
-    /**
-     * enable the current sense. default implementation does nothing, but you can
-     * override it to do something useful.
-     */
-    virtual void enable();
+/**
+ * Function used for Park transform in FOC control
+ *   It reads the Alpha Beta currents and electrical angle of the motor 
+ *   It returns the D and Q currents
+ * 
+ * @param current - phase current
+ */
+DQCurrent_s CurrentSense_getDQCurrents(CurrentSense *cs, ABCurrent_s current,float angle_el);
 
-    /**
-     * disable the current sense. default implementation does nothing, but you can
-     * override it to do something useful.
-     */
-    virtual void disable();
 
-    /**
-     * Function used to align the current sense with the BLDC motor driver
-    */
-    int alignBLDCDriver(float align_voltage, BLDCDriver* driver, bool modulation_centered);
-    /**
-     * Function used to align the current sense with the Stepper motor driver
-    */
-    int alignStepperDriver(float align_voltage, StepperDriver* driver, bool modulation_centered);
-    /**
-     * Function used to align the current sense with the Hybrid motor driver
-     */
-    int alignHybridDriver(float align_voltage, BLDCDriver* driver, bool modulation_centered);
+/**
+ * Function used to align the current sense with the BLDC motor driver
+*/
+int CurrentSense_alignBLDCDriver(CurrentSense *cs, float align_voltage, FOCDriver* driver, bool modulation_centered);
+/**
+ * Function used to align the current sense with the Stepper motor driver
+*/
+int CurrentSense_alignStepperDriver(CurrentSense *cs, float align_voltage, FOCDriver* driver, bool modulation_centered);
+/**
+ * Function used to align the current sense with the Hybrid motor driver
+ */
+int CurrentSense_alignHybridDriver(CurrentSense *cs, float align_voltage, FOCDriver* driver, bool modulation_centered);
 
-    /**
-     * Function used to read the average current values over N samples
-    */
-    PhaseCurrent_s readAverageCurrents(int N=100);
-
-};
+/**
+ * Function used to read the average current values over N samples
+*/
+PhaseCurrent_s CurrentSense_readAverageCurrents(CurrentSense *cs, int N);
 
 #endif

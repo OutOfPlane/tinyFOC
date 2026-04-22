@@ -1,7 +1,7 @@
 
 #ifndef __SIMPLEFOCDEBUG_H__
 #define __SIMPLEFOCDEBUG_H__
-
+#include "common/foc_utils.h"
 
 
 /**
@@ -35,39 +35,39 @@
 
 #ifndef SIMPLEFOC_DISABLE_DEBUG 
 
-class SimpleFOCDebug {
-public:
-    static void enable(Print* debugPrint = &Serial);
-
-    static void println(const __FlashStringHelper* msg);
-    static void println(const StringSumHelper msg);
-    static void println(const char* msg);
-    static void println(const __FlashStringHelper* msg, float val);
-    static void println(const char* msg, float val);
-    static void println(const __FlashStringHelper* msg, int val);
-    static void println(const char* msg, int val);
-    static void println(const char* msg, char val);
-    static void println();
-    static void println(int val);
-    static void println(float val);
-
-    static void print(const char* msg);
-    static void print(const __FlashStringHelper* msg);
-    static void print(const StringSumHelper msg);
-    static void print(int val);
-    static void print(float val);
-
-protected:
-    static Print* _debugPrint;
-};
+void SimpleFOCDebug_enable(Print* debugPrint);
+void SimpleFOCDebug_println_s(const char* msg);
+void SimpleFOCDebug_println_f(const char* msg, float val);
+void SimpleFOCDebug_println_i(const char* msg, int val);
+void SimpleFOCDebug_println_c(const char* msg, char val);
+void SimpleFOCDebug_println();
+void SimpleFOCDebug_println_i(int val);
+void SimpleFOCDebug_println_f(float val);
+void SimpleFOCDebug_print_s(const char* msg);
+void SimpleFOCDebug_print_i(int val);
+void SimpleFOCDebug_print_f(float val);
 
 
-#define SIMPLEFOC_DEBUG(msg, ...) \
-    SimpleFOCDebug::println(F(msg), ##__VA_ARGS__)
+#define SIMPLEFOC_DEBUG(msg) \
+    SimpleFOCDebug_println_s(msg)
 
+#define SIMPLEFOC_DEBUG_c(msg, val) \
+    SimpleFOCDebug_println_c(msg, val)
+
+#define SIMPLEFOC_DEBUG_f(msg, val) \
+    SimpleFOCDebug_println_f(msg, val)
+
+#define SIMPLEFOC_DEBUG_i(msg, str) \
+    SimpleFOCDebug_println_i(msg, val)
 #else  //ifndef SIMPLEFOC_DISABLE_DEBUG
  
-#define SIMPLEFOC_DEBUG(msg, ...)
+#define SIMPLEFOC_DEBUG(msg)
+
+#define SIMPLEFOC_DEBUG_c(msg, val)
+
+#define SIMPLEFOC_DEBUG_f(msg, val)
+
+#define SIMPLEFOC_DEBUG_i(msg, str)
 
 
 #endif //ifndef SIMPLEFOC_DISABLE_DEBUG

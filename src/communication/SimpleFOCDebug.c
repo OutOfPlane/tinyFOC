@@ -1,18 +1,18 @@
 
 #include "SimpleFOCDebug.h"
-
+#include "stdint.h"
 #ifndef SIMPLEFOC_DISABLE_DEBUG
 
 
-Print* SimpleFOCDebug::_debugPrint = NULL;
+Print* _debugPrint = NULL;
 
 
-void SimpleFOCDebug::enable(Print* debugPrint) {
+void SimpleFOCDebug_enable(Print* debugPrint) {
     _debugPrint = debugPrint;
 }
 
 
-void SimpleFOCDebug::println(int val) {
+void SimpleFOCDebug_println(int val) {
     if (_debugPrint != NULL) {
         _debugPrint->println(val);
     }
