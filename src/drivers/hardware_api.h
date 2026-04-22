@@ -4,7 +4,7 @@
 #include "../common/foc_utils.h"
 #include "../common/time_utils.h"
 #include "../communication/SimpleFOCDebug.h"
-#include "../common/base_classes/FOCDriver.h"
+#include "../common/base/FOCDriver.h"
 
 
 // these defines determine the polarity of the PWM output. Normally, the polarity is active-high,

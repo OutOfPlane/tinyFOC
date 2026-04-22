@@ -1,7 +1,7 @@
 #ifndef COMMANDS_H
 #define COMMANDS_H
 
-#include "../common/base_classes/FOCMotor.h"
+#include "../common/base/FOCMotor.h"
 #include "../common/pid.h"
 #include "../common/lowpass_filter.h"
 #include "commands.h"

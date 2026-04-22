@@ -1,4 +1,4 @@
-#include "common/base_classes/FOCMotor.h"
+#include "common/base/FOCMotor.h"
 
 // time measuring function
 // It filters the value using low pass filtering alpha = 0.1

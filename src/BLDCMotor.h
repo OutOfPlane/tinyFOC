@@ -1,10 +1,9 @@
 #ifndef BLDCMotor_h
 #define BLDCMotor_h
 
-#include "common/base_classes/FOCMotor.h"
-#include "common/base_classes/Sensor.h"
-#include "common/base_classes/FOCDriver.h"
-#include "common/base_classes/BLDCDriver.h"
+#include "common/base/FOCMotor.h"
+#include "common/base/Sensor.h"
+#include "common/base/FOCDriver.h"
 #include "common/foc_utils.h"
 #include "common/time_utils.h"
 #include "common/defaults.h"
@@ -12,7 +11,7 @@
 /**
  BLDC motor class
 */
-class BLDCMotor: public FOCMotor
+typedef struct s_BLDCMotor
 {
   public:
     /**

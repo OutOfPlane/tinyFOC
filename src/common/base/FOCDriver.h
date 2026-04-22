@@ -61,4 +61,6 @@ typedef struct s_FOCDriver{
 
 } FOCDriver;
 
+void FOCDriver_load_default(FOCDriver *driver);
+
 #endif

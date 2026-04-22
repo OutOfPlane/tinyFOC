@@ -4,7 +4,7 @@
 #include "../common/foc_utils.h"
 #include "../common/time_utils.h"
 #include "../common/defaults.h"
-#include "../common/base_classes/CurrentSense.h"
+#include "../common/base/CurrentSense.h"
 #include "../common/lowpass_filter.h"
 #include "hardware_api.h"
 
