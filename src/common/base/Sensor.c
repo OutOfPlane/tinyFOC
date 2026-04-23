@@ -58,14 +58,14 @@ float default_getVelocity(Sensor *sns) {
 
 void default_init(Sensor *sns) {
     // initialize all the internal variables of Sensor to ensure a "smooth" startup (without a 'jump' from zero)
-    getSensorAngle(); // call once
+    sns->getSensorAngle(sns); // call once
     delayMicroseconds(1);
-    sns->vel_angle_prev = getSensorAngle(); // call again
+    sns->vel_angle_prev = sns->getSensorAngle(sns); // call again
     sns->vel_angle_prev_ts = _micros();
     delay(1);
-    getSensorAngle(); // call once
+    sns->getSensorAngle(sns); // call once
     delayMicroseconds(1);
-    sns->angle_prev = getSensorAngle(); // call again
+    sns->angle_prev = sns->getSensorAngle(sns); // call again
     sns->angle_prev_ts = _micros();
 }
 

@@ -1,13 +1,13 @@
 /*!
- * @file SimpleFOC.h
+ * @file TinyFOC.h
  *
  * @mainpage Simple Field Oriented Control BLDC motor control library
  *
  * @section intro_sec Introduction
  *
  * Proper low-cost and low-power FOC supporting boards are very hard to find these days and even may not exist.<br> Even harder to find is a stable and simple FOC algorithm code capable of running on Arduino devices. Therefore this is an attempt to:
- * - Demystify FOC algorithm and make a robust but simple Arduino library: Arduino SimpleFOC library
- * - Develop a modular BLDC driver board: Arduino SimpleFOC shield.
+ * - Demystify FOC algorithm and make a robust but simple Arduino library: Arduino TinyFOC library
+ * - Develop a modular BLDC driver board: Arduino TinyFOC shield.
  *
  * @section features Features
  *  - Arduino compatible: Arduino library code
@@ -17,7 +17,7 @@
  *  - Modular:
  *     - Supports as many sensors , BLDC motors and driver boards as possible
  *     - Supports as many application requirements as possible
- *  - Plug & play: Arduino SimpleFOC shield
+ *  - Plug & play: Arduino TinyFOC shield
  * 
  * @section dependencies Supported Hardware
  *  - Motors 
@@ -43,7 +43,7 @@
  * 
  * 1. **Arduino IDE**: Go to `File > Examples > Simple FOC > [category] > [example]`
  * 2. **PlatformIO**: Copy example code from the `examples/` directory
- * 3. **GitHub**: Browse examples at https://github.com/simplefoc/Arduino-FOC/tree/master/examples
+ * 3. **GitHub**: Browse examples at https://github.com/TinyFOC/Arduino-FOC/tree/master/examples
  * 
  * Each example includes:
  * - Detailed comments explaining the code
@@ -53,7 +53,7 @@
  * 
  * @section example_code Example code
  * @code
-#include <SimpleFOC.h>
+#include <TinyFOC.h>
 
 //  BLDCMotor( pole_pairs )
 BLDCMotor motor = BLDCMotor(11);
@@ -106,27 +106,13 @@ void loop() {
  *
  */
 
-#ifndef SIMPLEFOC_H
-#define SIMPLEFOC_H
+#ifndef TinyFOC_H
+#define TinyFOC_H
 
 #include "BLDCMotor.h"
-// #include "StepperMotor.h"
-// #include "HybridStepperMotor.h"
-// #include "sensors/Encoder.h"
-// #include "sensors/MagneticSensorSPI.h"
-// #include "sensors/MagneticSensorI2C.h"
-// #include "sensors/MagneticSensorAnalog.h"
-// #include "sensors/MagneticSensorPWM.h"
 #include "sensors/HallSensor.h"
-// #include "sensors/GenericSensor.h"
-#include "drivers/BLDCDriver6PWM.h"
-// #include "drivers/StepperDriver4PWM.h"
-// #include "drivers/StepperDriver2PWM.h"
-// #include "current_sense/InlineCurrentSense.h"
-// #include "current_sense/LowsideCurrentSense.h"
-#include "current_sense/GenericCurrentSense.h"
-#include "communication/Commander.h"
-// #include "communication/StepDirListener.h"
-#include "communication/SimpleFOCDebug.h"
+#include "common/base/CurrentSense.h"
+#include "common/base/FOCDriver.h"
+#include "communication/TinyFOCDebug.h"
 
 #endif

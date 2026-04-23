@@ -1,5 +1,5 @@
 ArduinoFOC	KEYWORD1
-SimpleFOC	KEYWORD1
+TinyFOC	KEYWORD1
 BLDCMotor	KEYWORD1
 FOCMotor	KEYWORD1
 StepperMotor	KEYWORD1
@@ -24,7 +24,7 @@ Commander	KEYWORD1
 StepDirListener	KEYWORD1   
 GenericCurrentSense	KEYWORD1   
 GenericSensor	KEYWORD1   
-SimpleFOCDebug	KEYWORD1   
+TinyFOCDebug	KEYWORD1   
 
 initFOC	KEYWORD2
 loopFOC	KEYWORD2

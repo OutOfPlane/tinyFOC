@@ -12,6 +12,15 @@
 
  #define CURRENT_SENSE_N 100
  #define CURRENT_SENSE_MOD_CENTERED false
+
+
+typedef struct s_CurrentSense_ll{
+       void (*init)(struct s_CurrentSense_ll *ll);
+       float (*readcurrents)(struct s_CurrentSense_ll *ll, float *phA, float *phB, float *phC);
+       bool initOK;
+       void *param;
+} CurrentSense_ll;
+
 typedef struct s_CurrentSense{
     /**
      *  Function intialising the CurrentSense class
@@ -20,6 +29,8 @@ typedef struct s_CurrentSense{
      * @returns -  0 - for failure &  1 - for success 
      */
     int (*init)(struct s_CurrentSense *cs);
+
+    CurrentSense_ll *ll; //hw level driver
 
     /**
      * Function intended to verify if:

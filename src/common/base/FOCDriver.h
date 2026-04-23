@@ -18,6 +18,19 @@ enum DriverType{
     DriverType_Hybrid=3
 };
 
+typedef struct s_FOCDriver_ll{
+       void (*init)(struct s_FOCDriver_ll *ll);
+       void (*setpwm)(struct s_FOCDriver_ll *ll, float dcA, float dcB, float dcC);
+       void (*enable)(struct s_FOCDriver_ll *ll);
+       void (*disable)(struct s_FOCDriver_ll *ll);
+       bool initOK;
+       void *param;
+
+       float dcA;
+       float dcB;
+       float dcC;
+} FOCDriver_ll;
+
 /**
  * FOC driver class
  */
@@ -32,12 +45,12 @@ typedef struct s_FOCDriver{
         /** get the driver type*/
         enum DriverType (*type)(struct s_FOCDriver *fd);
 
-        long pwm_frequency; //!< pwm frequency value in hertz
+        FOCDriver_ll *ll; //hw level driver
+
         float voltage_power_supply; //!< power supply voltage
         float voltage_limit; //!< limiting voltage set to the motor
 
         bool initialized; //!< true if driver was successfully initialized
-        void* params; //!< pointer to hardware specific parameters of driver
 
         bool enable_active_high; //!< enable pin should be set to high to enable the driver (default is HIGH)
 

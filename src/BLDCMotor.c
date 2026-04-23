@@ -1,5 +1,5 @@
 #include "BLDCMotor.h"
-#include "./communication/SimpleFOCDebug.h"
+#include "./communication/TinyFOCDebug.h"
 
 
 // see https://www.youtube.com/watch?v=InzXA7mWBWE Slide 5
@@ -30,210 +30,180 @@ int trap_150_map[12][3] = {
     {1,1,-1} 
 };
 
-// BLDCMotor( int pp , float R)
-// - pp            - pole pair number
-// - R             - motor phase resistance
-// - KV            - motor kv rating (rmp/v)
-// - Lq            - motor q-axis inductance [H]
-// - Ld            - motor d-axis inductance [H]
-BLDCMotor::BLDCMotor(int pp, float _R, float _KV, float _Lq, float _Ld)
-: FOCMotor()
-{
-  // save pole pairs number
-  pole_pairs = pp;
-  // save phase resistance number
-  phase_resistance = _R;
-  // save back emf constant KV = 1/KV
-  // 1/sqrt(3) - rms value
-  KV_rating = _KV;
-  // save phase inductance
-  axis_inductance = {_Ld, _Lq};
-  phase_inductance = _Lq;  // FOR BACKWARDS COMPATIBILITY
-
-  // torque control type is voltage by default
-  torque_controller = TorqueControlType::voltage;
-}
-
-
-/**
-	Link the driver which controls the motor
-*/
-void BLDCMotor::linkDriver(BLDCDriver* _driver) {
-  driver = _driver;
-}
 
 // init hardware pins
-int BLDCMotor::init() {
-  if (!driver || !driver->initialized) {
-    motor_status = FOCMotorStatus::motor_init_failed;
-    SIMPLEFOC_MOTOR_ERROR("Init not possible, driver not init");
+int BLDCMotor_init(FOCMotor *motor) {
+  if (!motor->driver || !motor->driver->initialized) {
+    motor->motor_status = FOCMotorStatus_init_failed;
+    TinyFOC_MOTOR_ERROR("Init not possible, driver not init");
     return 0;
   }
-  motor_status = FOCMotorStatus::motor_initializing;
-  SIMPLEFOC_MOTOR_DEBUG("Init");
+  motor->motor_status = FOCMotorStatus_initializing;
+  TinyFOC_MOTOR_DEBUG("Init");
 
   // sanity check for the voltage limit configuration
-  if(voltage_limit > driver->voltage_limit) voltage_limit =  driver->voltage_limit;
+  if(motor->voltage_limit > motor->driver->voltage_limit) motor->voltage_limit =  motor->driver->voltage_limit;
   // constrain voltage for sensor alignment
-  if(voltage_sensor_align > voltage_limit) voltage_sensor_align = voltage_limit;
+  if(motor->voltage_sensor_align > motor->voltage_limit) motor->voltage_sensor_align = motor->voltage_limit;
 
   // update limits in the motor controllers
-  updateCurrentLimit(current_limit);
-  updateVoltageLimit(voltage_limit);
-  updateVelocityLimit(velocity_limit);
+  FOCMotor_updateVelocityLimit(motor, motor->velocity_limit);
+  FOCMotor_updateCurrentLimit(motor, motor->current_limit);
+  FOCMotor_updateVoltageLimit(motor, motor->voltage_limit);
   
-  if(_isset(phase_inductance) && !(_isset(axis_inductance.q))) {
+  if(_isset(motor->phase_inductance) && !(_isset(motor->axis_inductance.q))) {
     // if only single inductance value is set, use it for both d and q axis
-    axis_inductance = {phase_inductance, phase_inductance};
+    motor->axis_inductance.q = motor->phase_inductance;
+    motor->axis_inductance.d = motor->phase_inductance;
   } 
   
   // if using open loop control, set a CW as the default direction if not already set
   // only if no sensor is used
-  if(!sensor){
-    if ((controller==MotionControlType::angle_openloop
-      ||controller==MotionControlType::velocity_openloop)
-      && (sensor_direction == Direction::UNKNOWN)) {
-        sensor_direction = Direction::CW;
+  if(!motor->sensor){
+    if ((motor->controller==MotionControlType_angle_openloop
+      ||motor->controller==MotionControlType_velocity_openloop)
+      && (motor->sensor_direction == Direction_UNKNOWN)) {
+        motor->sensor_direction = Direction_CW;
     }
   }
 
   _delay(500);
   // enable motor
-  SIMPLEFOC_MOTOR_DEBUG("Enable driver.");
-  enable();
+  TinyFOC_MOTOR_DEBUG("Enable driver.");
+  motor->enable(motor);
   _delay(500);
-  motor_status = FOCMotorStatus::motor_uncalibrated;
+  motor->motor_status = FOCMotorStatus_uncalibrated;
   return 1;
 }
 
 
 // disable motor driver
-void BLDCMotor::disable()
+void BLDCMotor_disable(FOCMotor *motor)
 {
   // disable the current sense
-  if(current_sense) current_sense->disable();
+  if(motor->current_sense) motor->current_sense->disable(motor->current_sense);
   // set zero to PWM
-  driver->setPwm(0, 0, 0);
+  motor->driver->setPwm(motor->driver, 0, 0, 0);
   // disable the driver
-  driver->disable();
+  motor->driver->disable(motor->driver);
   // motor status update
-  enabled = 0;
+  motor->enabled = 0;
 }
 // enable motor driver
-void BLDCMotor::enable()
+void BLDCMotor_enable(FOCMotor *motor)
 {
   // enable the driver
-  driver->enable();
+  motor->driver->enable(motor->driver);
   // set zero to PWM
-  driver->setPwm(0, 0, 0);
+  motor->driver->setPwm(motor->driver, 0, 0, 0);
   // enable the current sense
-  if(current_sense) current_sense->enable();
+  if(motor->current_sense) motor->current_sense->enable(motor->current_sense);
   // reset the pids
-  PID_velocity.reset();
-  P_angle.reset();
-  PID_current_q.reset();
-  PID_current_d.reset();
+  PIDController_reset(&motor->PID_velocity);
+  PIDController_reset(&motor->P_angle);
+  PIDController_reset(&motor->PID_current_q);
+  PIDController_reset(&motor->PID_current_d);
   // motor status update
-  enabled = 1;
+  motor->enabled = 1;
 }
 
 /**
   FOC functions
 */
 
-float BLDCMotor::estimateBEMF(float vel){
+float BLDCMotor_estimateBEMF(FOCMotor *motor, float vel){
   // bemf constant is approximately 1/KV rating
   // V_bemf = K_bemf * velocity
-  return vel/(KV_rating*_SQRT3)/_RPM_TO_RADS;
+  return vel/(motor->KV_rating*_SQRT3)/_RPM_TO_RADS;
 }
 
 
 // Method using FOC to set Uq and Ud to the motor at the optimal angle
 // Function implementing Space Vector PWM, Sine PWM and Trapezoidal commutation algorithms
-void BLDCMotor::setPhaseVoltage(float Uq, float Ud, float angle_el) {
+void BLDCMotor_setPhaseVoltage(FOCMotor *motor, float Uq, float Ud, float angle_el) {
 
   float center;
   int sector;
   float _ca,_sa;
 
-  switch (foc_modulation)
+  switch (motor->foc_modulation)
   {
-    case FOCModulationType::Trapezoid_120 :
+    case FOCModulationType_Trapezoid_120 :
       // see https://www.youtube.com/watch?v=InzXA7mWBWE Slide 5
       // determine the sector
       sector = 6 * (_normalizeAngle(angle_el + _PI_6 ) / _2PI); // adding PI/6 to align with other modes
       // centering the voltages around either
       // modulation_centered == true > driver.voltage_limit/2
       // modulation_centered == false > or Adaptable centering, all phases drawn to 0 when Uq=0
-      center = modulation_centered ? (driver->voltage_limit)/2 : Uq;
+      center = motor->modulation_centered ? (motor->driver->voltage_limit)/2 : Uq;
 
       if(trap_120_map[sector][0]  == _HIGH_IMPEDANCE){
-        Ua= center;
-        Ub = trap_120_map[sector][1] * Uq + center;
-        Uc = trap_120_map[sector][2] * Uq + center;
-        driver->setPhaseState(PhaseState::PHASE_OFF, PhaseState::PHASE_ON, PhaseState::PHASE_ON); // disable phase if possible
+        motor->Ua= center;
+        motor->Ub = trap_120_map[sector][1] * Uq + center;
+        motor->Uc = trap_120_map[sector][2] * Uq + center;
+        motor->driver->setPhaseState(motor->driver, PHASE_OFF, PHASE_ON, PHASE_ON); // disable phase if possible
       }else if(trap_120_map[sector][1]  == _HIGH_IMPEDANCE){
-        Ua = trap_120_map[sector][0] * Uq + center;
-        Ub = center;
-        Uc = trap_120_map[sector][2] * Uq + center;
-        driver->setPhaseState(PhaseState::PHASE_ON, PhaseState::PHASE_OFF, PhaseState::PHASE_ON);// disable phase if possible
+        motor->Ua = trap_120_map[sector][0] * Uq + center;
+        motor->Ub = center;
+        motor->Uc = trap_120_map[sector][2] * Uq + center;
+        motor->driver->setPhaseState(motor->driver, PHASE_ON, PHASE_OFF, PHASE_ON);// disable phase if possible
       }else{
-        Ua = trap_120_map[sector][0] * Uq + center;
-        Ub = trap_120_map[sector][1] * Uq + center;
-        Uc = center;
-        driver->setPhaseState(PhaseState::PHASE_ON, PhaseState::PHASE_ON, PhaseState::PHASE_OFF);// disable phase if possible
+        motor->Ua = trap_120_map[sector][0] * Uq + center;
+        motor->Ub = trap_120_map[sector][1] * Uq + center;
+        motor->Uc = center;
+        motor->driver->setPhaseState(motor->driver, PHASE_ON, PHASE_ON, PHASE_OFF);// disable phase if possible
       }
 
     break;
 
-    case FOCModulationType::Trapezoid_150 :
+    case FOCModulationType_Trapezoid_150 :
       // see https://www.youtube.com/watch?v=InzXA7mWBWE Slide 8
       // determine the sector
       sector = 12 * (_normalizeAngle(angle_el + _PI_6 ) / _2PI); // adding PI/6 to align with other modes
       // centering the voltages around either
       // modulation_centered == true > driver.voltage_limit/2
       // modulation_centered == false > or Adaptable centering, all phases drawn to 0 when Uq=0
-      center = modulation_centered ? (driver->voltage_limit)/2 : Uq;
+      center = motor->modulation_centered ? (motor->driver->voltage_limit)/2 : Uq;
 
       if(trap_150_map[sector][0]  == _HIGH_IMPEDANCE){
-        Ua= center;
-        Ub = trap_150_map[sector][1] * Uq + center;
-        Uc = trap_150_map[sector][2] * Uq + center;
-        driver->setPhaseState(PhaseState::PHASE_OFF, PhaseState::PHASE_ON, PhaseState::PHASE_ON); // disable phase if possible
+        motor->Ua= center;
+        motor->Ub = trap_150_map[sector][1] * Uq + center;
+        motor->Uc = trap_150_map[sector][2] * Uq + center;
+        motor->driver->setPhaseState(motor->driver, PHASE_OFF, PHASE_ON, PHASE_ON); // disable phase if possible
       }else if(trap_150_map[sector][1]  == _HIGH_IMPEDANCE){
-        Ua = trap_150_map[sector][0] * Uq + center;
-        Ub = center;
-        Uc = trap_150_map[sector][2] * Uq + center;
-        driver->setPhaseState(PhaseState::PHASE_ON, PhaseState::PHASE_OFF, PhaseState::PHASE_ON); // disable phase if possible
+        motor->Ua = trap_150_map[sector][0] * Uq + center;
+        motor->Ub = center;
+        motor->Uc = trap_150_map[sector][2] * Uq + center;
+        motor->driver->setPhaseState(motor->driver, PHASE_ON, PHASE_OFF, PHASE_ON); // disable phase if possible
       }else if(trap_150_map[sector][2]  == _HIGH_IMPEDANCE){
-        Ua = trap_150_map[sector][0] * Uq + center;
-        Ub = trap_150_map[sector][1] * Uq + center;
-        Uc = center;
-        driver->setPhaseState(PhaseState::PHASE_ON, PhaseState::PHASE_ON, PhaseState::PHASE_OFF); // disable phase if possible
+        motor->Ua = trap_150_map[sector][0] * Uq + center;
+        motor->Ub = trap_150_map[sector][1] * Uq + center;
+        motor->Uc = center;
+        motor->driver->setPhaseState(motor->driver, PHASE_ON, PHASE_ON, PHASE_OFF); // disable phase if possible
       }else{
-        Ua = trap_150_map[sector][0] * Uq + center;
-        Ub = trap_150_map[sector][1] * Uq + center;
-        Uc = trap_150_map[sector][2] * Uq + center;
-        driver->setPhaseState(PhaseState::PHASE_ON, PhaseState::PHASE_ON, PhaseState::PHASE_ON); // enable all phases
+        motor->Ua = trap_150_map[sector][0] * Uq + center;
+        motor->Ub = trap_150_map[sector][1] * Uq + center;
+        motor->Uc = trap_150_map[sector][2] * Uq + center;
+        motor->driver->setPhaseState(motor->driver, PHASE_ON, PHASE_ON, PHASE_ON); // enable all phases
       }
 
     break;
 
-    case FOCModulationType::SinePWM :
-    case FOCModulationType::SpaceVectorPWM :
+    case FOCModulationType_SinePWM :
+    case FOCModulationType_SpaceVectorPWM :
 
         // Sinusoidal PWM modulation
         // Inverse Park + Clarke transformation
         _sincos(angle_el, &_sa, &_ca);
 
         // Inverse park transform
-        Ualpha = _ca * Ud - _sa * Uq;  // -sin(angle) * Uq;
-        Ubeta = _sa * Ud + _ca * Uq;    //  cos(angle) * Uq;
+        motor->Ualpha = _ca * Ud - _sa * Uq;  // -sin(angle) * Uq;
+        motor->Ubeta = _sa * Ud + _ca * Uq;    //  cos(angle) * Uq;
 
         // Clarke transform
-        Ua = Ualpha;
-        Ub = -0.5f * Ualpha + _SQRT3_2 * Ubeta;
-        Uc = -0.5f * Ualpha - _SQRT3_2 * Ubeta;
+        motor->Ua = motor->Ualpha;
+        motor->Ub = -0.5f * motor->Ualpha + _SQRT3_2 * motor->Ubeta;
+        motor->Uc = -0.5f * motor->Ualpha - _SQRT3_2 * motor->Ubeta;
 
         // centering the voltages around either
         // - centered modulation: around driver.voltage_limit/2
@@ -243,28 +213,51 @@ void BLDCMotor::setPhaseVoltage(float Uq, float Ud, float angle_el) {
         //     - The part of the duty cycle in which all phases are 
         //       off is longer than in centered modulation   
         //     - Both SinePWM and SpaceVectorPWM have the same form for non-centered modulation
-      if (modulation_centered) {
-        center = driver->voltage_limit/2;
-        if (foc_modulation == FOCModulationType::SpaceVectorPWM){
-          // discussed here: https://community.simplefoc.com/t/embedded-world-2023-stm32-cordic-co-processor/3107/165?u=candas1
+      if (motor->modulation_centered) {
+        center = motor->driver->voltage_limit/2;
+        if (motor->foc_modulation == FOCModulationType_SpaceVectorPWM){
+          // discussed here: https://community.TinyFOC.com/t/embedded-world-2023-stm32-cordic-co-processor/3107/165?u=candas1
           // a bit more info here: https://microchipdeveloper.com/mct5001:which-zsm-is-best
           // Midpoint Clamp
-          float Umin = min(Ua, min(Ub, Uc));
-          float Umax = max(Ua, max(Ub, Uc));
+          float Umin = min(motor->Ua, min(motor->Ub, motor->Uc));
+          float Umax = max(motor->Ua, max(motor->Ub, motor->Uc));
           center -= (Umax+Umin) / 2;
         } 
-        Ua += center;
-        Ub += center;
-        Uc += center;
+        motor->Ua += center;
+        motor->Ub += center;
+        motor->Uc += center;
       }else{
-        float Umin = min(Ua, min(Ub, Uc));
-        Ua -= Umin;
-        Ub -= Umin;
-        Uc -= Umin;
+        float Umin = min(motor->Ua, min(motor->Ub, motor->Uc));
+        motor->Ua -= Umin;
+        motor->Ub -= Umin;
+        motor->Uc -= Umin;
       }
       break;
   }
 
   // set the voltages in driver
-  driver->setPwm(Ua, Ub, Uc);
+  motor->driver->setPwm(motor->driver, motor->Ua, motor->Ub, motor->Uc);
+}
+
+void BLDCMotor_load_default(FOCMotor *motor)
+{
+  FOCMotor_load_default(motor);
+  // save pole pairs number
+  motor->pole_pairs = NOT_SET;
+  // save phase resistance number
+  motor->phase_resistance = NOT_SET;
+  // save back emf constant KV = 1/KV
+  // 1/sqrt(3) - rms value
+  motor->KV_rating = NOT_SET;
+  // save phase inductance
+  motor->axis_inductance.d = NOT_SET;
+  motor->axis_inductance.q = NOT_SET;
+  motor->phase_inductance = NOT_SET;  // FOR BACKWARDS COMPATIBILITY
+
+  // torque control type is voltage by default
+  motor->torque_controller = TorqueControlType_voltage;
+
+  motor->estimateBEMF = BLDCMotor_estimateBEMF;
+  motor->setPhaseVoltage = BLDCMotor_setPhaseVoltage;
+  motor->init = BLDCMotor_init;
 }

@@ -1,15 +1,15 @@
 #include "CurrentSense.h"
-#include "../../communication/SimpleFOCDebug.h"
+#include "../../communication/TinyFOCDebug.h"
 #include "stdint.h"
 
-
-// get current magnitude 
-//   - absolute  - if no electrical_angle provided 
+// get current magnitude
+//   - absolute  - if no electrical_angle provided
 //   - signed    - if angle provided
-float default_getDCCurrent(CurrentSense *cs, float motor_electrical_angle){
+float default_getDCCurrent(CurrentSense *cs, float motor_electrical_angle)
+{
     // read current phase currents
     PhaseCurrent_s current = cs->getPhaseCurrents(cs);
-    
+
     // calculate clarke transform
     ABCurrent_s ABcurrent = CurrentSense_getABCurrents(cs, current);
 
@@ -18,25 +18,74 @@ float default_getDCCurrent(CurrentSense *cs, float motor_electrical_angle){
 
     // if motor angle provided function returns signed value of the current
     // determine the sign of the current
-    // sign(atan2(current.q, current.d)) is the same as c.q > 0 ? 1 : -1  
-    if(motor_electrical_angle) {
+    // sign(atan2(current.q, current.d)) is the same as c.q > 0 ? 1 : -1
+    if (motor_electrical_angle)
+    {
         float ct;
         float st;
         _sincos(motor_electrical_angle, &st, &ct);
-        sign = (ABcurrent.beta*ct - ABcurrent.alpha*st) > 0 ? 1 : -1;  
+        sign = (ABcurrent.beta * ct - ABcurrent.alpha * st) > 0 ? 1 : -1;
     }
     // return current magnitude
-    return sign*_sqrt(ABcurrent.alpha*ABcurrent.alpha + ABcurrent.beta*ABcurrent.beta);
+    return sign * _sqrt(ABcurrent.alpha * ABcurrent.alpha + ABcurrent.beta * ABcurrent.beta);
 }
 
-void default_enable(CurrentSense *cs){
+void default_enable(CurrentSense *cs) {
     // nothing is done here, but you can override this function
 };
 
-void default_disable(CurrentSense *cs){
+void default_disable(CurrentSense *cs) {
     // nothing is done here, but you can override this function
 };
 
+// Function finding zero offsets of the ADC
+void calibrateOffsets(CurrentSense *cs)
+{
+    const int calibration_rounds = 1000;
+
+    // find adc offset = zero current voltage
+    cs->offset_ia = 0;
+    cs->offset_ib = 0;
+    cs->offset_ic = 0;
+    // read the adc voltage 1000 times ( arbitrary number )
+    PhaseCurrent_s current;
+    for (int i = 0; i < calibration_rounds; i++)
+    {
+        cs->ll->readcurrents(cs->ll, &current.a, &current.b, &current.c);
+        cs->offset_ia += current.a;
+        cs->offset_ib += current.b;
+        cs->offset_ic += current.c;
+        _delay(1);
+    }
+    // calculate the mean offsets
+    cs->offset_ia = cs->offset_ia / calibration_rounds;
+    cs->offset_ib = cs->offset_ib / calibration_rounds;
+    cs->offset_ic = cs->offset_ic / calibration_rounds;
+}
+
+// Inline sensor init function
+int default_init(CurrentSense *cs)
+{
+    // configure ADC variables
+    if (cs->ll != NULL && cs->ll->init != NULL)
+        cs->ll->init(cs->ll);
+    // calibrate zero offsets
+    calibrateOffsets(cs);
+    // set the initialized flag
+    cs->initialized = cs->ll->initOK;
+    return cs->initialized;
+}
+
+// read all three phase currents (if possible 2 or 3)
+PhaseCurrent_s default_getPhaseCurrents(CurrentSense *cs)
+{
+    PhaseCurrent_s current;
+    cs->ll->readcurrents(cs->ll, &current.a, &current.b, &current.c);
+    current.a = (current.a - cs->offset_ia); // amps
+    current.b = (current.b - cs->offset_ib); // amps
+    current.c = (current.c - cs->offset_ic); // amps
+    return current;
+}
 
 // Function aligning the current sense with motor driver
 // if all pins are connected well none of this is really necessary! - can be avoided
@@ -47,34 +96,37 @@ void default_disable(CurrentSense *cs){
 // 3 - success but gains inverted
 // 4 - success but pins reconfigured and gains inverted
 // IMPORTANT, this function can be overriden in the child class
-int default_driverAlign(CurrentSense *cs, float voltage, bool modulation_centered){
-        
+int default_driverAlign(CurrentSense *cs, float voltage, bool modulation_centered)
+{
+
     int exit_flag = 1;
-    if(cs->skip_align) return exit_flag;
+    if (cs->skip_align)
+        return exit_flag;
 
-    if (!cs->initialized) return 0;
+    if (!cs->initialized)
+        return 0;
 
-    // check if stepper or BLDC 
-    switch(cs->driver_type){
-        case DriverType_BLDC:
-            return alignBLDCDriver(voltage, cs->driver, modulation_centered);
-        case DriverType_Stepper:
-            return alignStepperDriver(voltage, cs->driver, modulation_centered);
-        case DriverType_Hybrid:
-            return alignHybridDriver(voltage, cs->driver, modulation_centered);
-        default:
-            // driver type not supported
-            SIMPLEFOC_DEBUG("CS: Cannot align driver type!");
-            return 0; 
+    // check if stepper or BLDC
+    switch (cs->driver_type)
+    {
+    case DriverType_BLDC:
+        return alignBLDCDriver(voltage, cs->driver, modulation_centered);
+    case DriverType_Stepper:
+        return alignStepperDriver(voltage, cs->driver, modulation_centered);
+    case DriverType_Hybrid:
+        return alignHybridDriver(voltage, cs->driver, modulation_centered);
+    default:
+        // driver type not supported
+        TinyFOC_DEBUG("CS: Cannot align driver type!");
+        return 0;
     }
 }
 
-
 void CurrentSense_load_default(CurrentSense *cs)
 {
-    cs->init = NULL;
+    cs->init = default_init;
     cs->driverAlign = default_driverAlign;
-    cs->getPhaseCurrents = NULL;
+    cs->getPhaseCurrents = default_getPhaseCurrents;
     cs->getDCCurrent = default_getDCCurrent;
     cs->enable = default_enable;
     cs->disable = default_disable;
@@ -82,17 +134,18 @@ void CurrentSense_load_default(CurrentSense *cs)
 
 // function used with the foc algorithm
 //   calculating DQ currents from phase currents
-//   - function calculating park and clarke transform of the phase currents 
+//   - function calculating park and clarke transform of the phase currents
 //   - using getPhaseCurrents and getABCurrents internally
-DQCurrent_s CurrentSense_getFOCCurrents(CurrentSense *cs, float angle_el){
+DQCurrent_s CurrentSense_getFOCCurrents(CurrentSense *cs, float angle_el)
+{
     // read current phase currents
     PhaseCurrent_s current = cs->getPhaseCurrents(cs);
 
     // calculate clarke transform
     ABCurrent_s ABcurrent = CurrentSense_getABCurrents(cs, current);
-    
+
     // calculate park transform
-    DQCurrent_s return_current = CurrentSense_getDQCurrents(cs, ABcurrent,angle_el);
+    DQCurrent_s return_current = CurrentSense_getDQCurrents(cs, ABcurrent, angle_el);
 
     return return_current;
 }
@@ -100,53 +153,68 @@ DQCurrent_s CurrentSense_getFOCCurrents(CurrentSense *cs, float angle_el){
 // function used with the foc algorithm
 //   calculating Alpha Beta currents from phase currents
 //   - function calculating Clarke transform of the phase currents
-ABCurrent_s CurrentSense_getABCurrents(CurrentSense *cs, PhaseCurrent_s current){
+ABCurrent_s CurrentSense_getABCurrents(CurrentSense *cs, PhaseCurrent_s current)
+{
 
     // check if driver is an instance of StepperDriver
     // if so there is no need to Clarke transform
-    if (cs->driver_type == DriverType_Stepper){
+    if (cs->driver_type == DriverType_Stepper)
+    {
         ABCurrent_s return_ABcurrent;
         return_ABcurrent.alpha = current.a;
         return_ABcurrent.beta = current.b;
         return return_ABcurrent;
     }
 
-    if (cs->driver_type == DriverType_Hybrid){
+    if (cs->driver_type == DriverType_Hybrid)
+    {
         ABCurrent_s return_ABcurrent;
-        //ia + ib + ic = 0
-        if(current.a == 0){
+        // ia + ib + ic = 0
+        if (current.a == 0)
+        {
             return_ABcurrent.alpha = -current.c - current.b;
             return_ABcurrent.beta = current.b;
-        }else if(current.b == 0){
+        }
+        else if (current.b == 0)
+        {
             return_ABcurrent.alpha = current.a;
             return_ABcurrent.beta = -current.c - current.a;
-        }else{
+        }
+        else
+        {
             return_ABcurrent.alpha = current.a;
             return_ABcurrent.beta = current.b;
         }
         return return_ABcurrent;
     }
 
-    // otherwise it's a BLDC motor and 
+    // otherwise it's a BLDC motor and
     // calculate clarke transform
     float i_alpha, i_beta;
-    if(!current.c){
+    if (!current.c)
+    {
         // if only two measured currents
-        i_alpha = current.a;  
+        i_alpha = current.a;
         i_beta = _1_SQRT3 * current.a + _2_SQRT3 * current.b;
-    }else if(!current.a){
+    }
+    else if (!current.a)
+    {
         // if only two measured currents
         float a = -current.c - current.b;
-        i_alpha = a;  
+        i_alpha = a;
         i_beta = _1_SQRT3 * a + _2_SQRT3 * current.b;
-    }else if(!current.b){
+    }
+    else if (!current.b)
+    {
         // if only two measured currents
         float b = -current.a - current.c;
-        i_alpha = current.a;  
+        i_alpha = current.a;
         i_beta = _1_SQRT3 * current.a + _2_SQRT3 * b;
-    } else {
+    }
+    else
+    {
         // signal filtering using identity a + b + c = 0. Assumes measurement error is normally distributed.
-        float mid = (1.f/3) * (current.a + current.b + current.c);
+        float mid = (1.f / 3) * (current.a + current.b + current.c);
         float a = current.a - mid;
         float b = current.b - mid;
         i_alpha = a;
@@ -162,8 +230,9 @@ ABCurrent_s CurrentSense_getABCurrents(CurrentSense *cs, PhaseCurrent_s current)
 // function used with the foc algorithm
 //   calculating D and Q currents from Alpha Beta currents and electrical angle
 //   - function calculating Clarke transform of the phase currents
-DQCurrent_s CurrentSense_getDQCurrents(CurrentSense *cs, ABCurrent_s current, float angle_el){
- // calculate park transform
+DQCurrent_s CurrentSense_getDQCurrents(CurrentSense *cs, ABCurrent_s current, float angle_el)
+{
+    // calculate park transform
     float ct;
     float st;
     _sincos(angle_el, &st, &ct);
@@ -174,18 +243,21 @@ DQCurrent_s CurrentSense_getDQCurrents(CurrentSense *cs, ABCurrent_s current, fl
 }
 
 /**
-	Driver linking to the current sense
+    Driver linking to the current sense
 */
-void CurrentSense_linkDriver(CurrentSense *cs, FOCDriver* _driver) {
+void CurrentSense_linkDriver(CurrentSense *cs, FOCDriver *_driver)
+{
     cs->driver = _driver;
     // save the driver type for easier access
     cs->driver_type = cs->driver->type(cs->driver);
 }
 
 // Helper function to read and average phase currents
-PhaseCurrent_s CurrentSense_readAverageCurrents(CurrentSense *cs, int N) {
+PhaseCurrent_s CurrentSense_readAverageCurrents(CurrentSense *cs, int N)
+{
     PhaseCurrent_s c = cs->getPhaseCurrents(cs);
-    for (int i = 0; i < N; i++) {
+    for (int i = 0; i < N; i++)
+    {
         PhaseCurrent_s c1 = cs->getPhaseCurrents(cs);
         c.a = c.a * 0.6f + 0.4f * c1.a;
         c.b = c.b * 0.6f + 0.4f * c1.b;
@@ -195,8 +267,6 @@ PhaseCurrent_s CurrentSense_readAverageCurrents(CurrentSense *cs, int N) {
     return c;
 };
 
-
-
 // Function aligning the current sense with motor driver
 // if all pins are connected well none of this is really necessary! - can be avoided
 // returns flag
@@ -205,11 +275,12 @@ PhaseCurrent_s CurrentSense_readAverageCurrents(CurrentSense *cs, int N) {
 // 2 - success but pins reconfigured
 // 3 - success but gains inverted
 // 4 - success but pins reconfigured and gains inverted
-int CurrentSense_alignBLDCDriver(CurrentSense *cs, float voltage, FOCDriver* bldc_driver, bool modulation_centered){
-        
+int CurrentSense_alignBLDCDriver(CurrentSense *cs, float voltage, FOCDriver *bldc_driver, bool modulation_centered)
+{
+
     // bool phases_switched = 0;
     // bool phases_inverted = 0;
-    
+
     // float zero = 0;
     // if(modulation_centered) zero = cs->driver->voltage_limit/2.0;
 
@@ -222,21 +293,20 @@ int CurrentSense_alignBLDCDriver(CurrentSense *cs, float voltage, FOCDriver* bld
     // _delay(500);
     // PhaseCurrent_s c_a = readAverageCurrents();
     // bldc_driver->setPwm(zero, zero, zero);
-    // // check if currents are to low (lower than 100mA) 
+    // // check if currents are to low (lower than 100mA)
     // // TODO calculate the 100mA threshold from the ADC resolution
     // // if yes throw an error and return 0
-    // // either the current sense is not connected or the current is 
+    // // either the current sense is not connected or the current is
     // // too low for calibration purposes (one should raise the motor.voltage_sensor_align)
     // if((fabs(c_a.a) < 0.1f) && (fabs(c_a.b) < 0.1f) && (fabs(c_a.c) < 0.1f)){
-    //         SIMPLEFOC_DEBUG("CS: Err too low current, rise voltage!");
+    //         TinyFOC_DEBUG("CS: Err too low current, rise voltage!");
     //         return 0; // measurement current too low
     // }
 
-    
-    // // now we have to determine 
+    // // now we have to determine
     // // 1) which pin correspond to which phase of the bldc driver
     // // 2) if the currents measured have good polarity
-    // // 
+    // //
     // // > when we apply a voltage to a phase A of the driver what we expect to measure is the current I on the phase A
     // //   and -I/2 on the phase B and I/2 on the phase C
 
@@ -271,7 +341,7 @@ int CurrentSense_alignBLDCDriver(CurrentSense *cs, float voltage, FOCDriver* bld
     // if(max_c_ratio >=1.5f){
     //     switch (max_i){
     //         case 1: // phase B is the max current
-    //             SIMPLEFOC_DEBUG("CS: Switch A-B");
+    //             TinyFOC_DEBUG("CS: Switch A-B");
     //             // switch phase A and B
     //             _swap(pinA, pinB);
     //             _swap(offset_ia, offset_ib);
@@ -280,7 +350,7 @@ int CurrentSense_alignBLDCDriver(CurrentSense *cs, float voltage, FOCDriver* bld
     //             phases_switched = true; // signal that pins have been switched
     //             break;
     //         case 2: // phase C is the max current
-    //             SIMPLEFOC_DEBUG("CS: Switch A-C");
+    //             TinyFOC_DEBUG("CS: Switch A-C");
     //             // switch phase A and C
     //             _swap(pinA, pinC);
     //             _swap(offset_ia, offset_ic);
@@ -291,25 +361,25 @@ int CurrentSense_alignBLDCDriver(CurrentSense *cs, float voltage, FOCDriver* bld
     //     }
     //     // check if the current is negative and invert the gain if so
     //     if( _sign(c_a.a) < 0 ){
-    //         SIMPLEFOC_DEBUG("CS: Inv A");
+    //         TinyFOC_DEBUG("CS: Inv A");
     //         gain_a *= -1;
     //         phases_inverted = true; // signal that pins have been inverted
     //     }
     // }else if(_isset(pinA) && _isset(pinB) && _isset(pinC)){
     //     // if all three currents are measured and none of them is significantly higher
     //     // we have a problem with the current sense
-    //     SIMPLEFOC_DEBUG("CS: Err A - all currents same magnitude!");
+    //     TinyFOC_DEBUG("CS: Err A - all currents same magnitude!");
     //     return 0;
     // }else{ //phase A is not measured so put the _NC to the phase A
     //     if(_isset(pinA) && !_isset(pinB)){
-    //         SIMPLEFOC_DEBUG("CS: Switch A-(B)NC");
+    //         TinyFOC_DEBUG("CS: Switch A-(B)NC");
     //         _swap(pinA, pinB);
     //         _swap(offset_ia, offset_ib);
     //         _swap(gain_a, gain_b);
     //         _swap(c_a.b, c_a.b);
     //         phases_switched = true; // signal that pins have been switched
     //     }else if(_isset(pinA) && !_isset(pinC)){
-    //         SIMPLEFOC_DEBUG("CS: Switch A-(C)NC");
+    //         TinyFOC_DEBUG("CS: Switch A-(C)NC");
     //         _swap(pinA, pinC);
     //         _swap(offset_ia, offset_ic);
     //         _swap(gain_a, gain_c);
@@ -321,9 +391,8 @@ int CurrentSense_alignBLDCDriver(CurrentSense *cs, float voltage, FOCDriver* bld
     // // - aligned with the driver phase A
     // // - or the phase A is not measured and the _NC is connected to the phase A
     // //
-    // // In either case A is done, now we have to check the phase B and C 
+    // // In either case A is done, now we have to check the phase B and C
 
-    
     // // set phase B active and phases A and C down
     // // 300 ms of ramping
     // for(int i=0; i < 100; i++){
@@ -358,10 +427,10 @@ int CurrentSense_alignBLDCDriver(CurrentSense *cs, float voltage, FOCDriver* bld
     //     switch (max_i){
     //         case 0: // phase A is the max current
     //             // this is an error as phase A is already aligned
-    //             SIMPLEFOC_DEBUG("CS: Err align B");
+    //             TinyFOC_DEBUG("CS: Err align B");
     //             return 0;
     //         case 2: // phase C is the max current
-    //             SIMPLEFOC_DEBUG("CS: Switch B-C");
+    //             TinyFOC_DEBUG("CS: Switch B-C");
     //             _swap(pinB, pinC);
     //             _swap(offset_ib, offset_ic);
     //             _swap(gain_b, gain_c);
@@ -371,18 +440,18 @@ int CurrentSense_alignBLDCDriver(CurrentSense *cs, float voltage, FOCDriver* bld
     //     }
     //     // check if the current is negative and invert the gain if so
     //     if( _sign(c_b.b) < 0 ){
-    //         SIMPLEFOC_DEBUG("CS: Inv B");
+    //         TinyFOC_DEBUG("CS: Inv B");
     //         gain_b *= -1;
     //         phases_inverted = true; // signal that pins have been inverted
     //     }
     // }else if(_isset(pinB) && _isset(pinC)){
     //     // if all three currents are measured and none of them is significantly higher
     //     // we have a problem with the current sense
-    //     SIMPLEFOC_DEBUG("CS: Err B - all currents same magnitude!");
+    //     TinyFOC_DEBUG("CS: Err B - all currents same magnitude!");
     //     return 0;
     // }else{ //phase B is not measured so put the _NC to the phase B
     //     if(_isset(pinB) && !_isset(pinC)){
-    //         SIMPLEFOC_DEBUG("CS: Switch B-(C)NC");
+    //         TinyFOC_DEBUG("CS: Switch B-(C)NC");
     //         _swap(pinB, pinC);
     //         _swap(offset_ib, offset_ic);
     //         _swap(gain_b, gain_c);
@@ -399,7 +468,7 @@ int CurrentSense_alignBLDCDriver(CurrentSense *cs, float voltage, FOCDriver* bld
     // // we have to check if the current is negative and invert the gain if so
     // if(_isset(pinC)){
     //     if( _sign(c_b.c) > 0 ){ // the expected current is -I/2 (if the phase A and B are aligned and C has correct polarity)
-    //         SIMPLEFOC_DEBUG("CS: Inv C");
+    //         TinyFOC_DEBUG("CS: Inv C");
     //         gain_c *= -1;
     //         phases_inverted = true; // signal that pins have been inverted
     //     }
@@ -415,7 +484,6 @@ int CurrentSense_alignBLDCDriver(CurrentSense *cs, float voltage, FOCDriver* bld
     // return exit_flag;
 }
 
-
 // Function aligning the current sense with motor driver
 // if all pins are connected well none of this is really necessary! - can be avoided
 // returns flag
@@ -424,15 +492,16 @@ int CurrentSense_alignBLDCDriver(CurrentSense *cs, float voltage, FOCDriver* bld
 // 2 - success but pins reconfigured
 // 3 - success but gains inverted
 // 4 - success but pins reconfigured and gains inverted
-int CurrentSense_alignStepperDriver(CurrentSense *cs, float voltage, FOCDriver* stepper_driver, bool modulation_centered){
-    
+int CurrentSense_alignStepperDriver(CurrentSense *cs, float voltage, FOCDriver *stepper_driver, bool modulation_centered)
+{
+
     // _UNUSED(modulation_centered);
 
     // bool phases_switched = 0;
     // bool phases_inverted = 0;
 
     // if(!_isset(pinA) || !_isset(pinB)){
-    //     SIMPLEFOC_DEBUG("CS: Pins A & B not specified!");
+    //     TinyFOC_DEBUG("CS: Pins A & B not specified!");
     //     return 0;
     // }
 
@@ -445,16 +514,16 @@ int CurrentSense_alignStepperDriver(CurrentSense *cs, float voltage, FOCDriver* 
     // _delay(500);
     // PhaseCurrent_s c = readAverageCurrents();
     // // disable the phases
-    // stepper_driver->setPwm(0, 0);        
+    // stepper_driver->setPwm(0, 0);
     // if (fabs(c.a) < 0.1f && fabs(c.b) < 0.1f ){
-    //     SIMPLEFOC_DEBUG("CS: Err too low current!");
+    //     TinyFOC_DEBUG("CS: Err too low current!");
     //     return 0; // measurement current too low
     // }
     // // align phase A
-    // // 1) only one phase can be measured so we first measure which ADC pin corresponds 
+    // // 1) only one phase can be measured so we first measure which ADC pin corresponds
     // // to the phase A by comparing the magnitude
     // if (fabs(c.a) < fabs(c.b)){
-    //     SIMPLEFOC_DEBUG("CS: Switch A-B");
+    //     TinyFOC_DEBUG("CS: Switch A-B");
     //     // switch phase A and B
     //     _swap(pinA, pinB);
     //     _swap(offset_ia, offset_ib);
@@ -463,7 +532,7 @@ int CurrentSense_alignStepperDriver(CurrentSense *cs, float voltage, FOCDriver* 
     // }
     // // 2) check if measured current a is positive and invert if not
     // if (c.a < 0){
-    //     SIMPLEFOC_DEBUG("CS: Inv A");
+    //     TinyFOC_DEBUG("CS: Inv A");
     //     gain_a *= -1;
     //     phases_inverted = true; // signal that pins have been inverted
     // }
@@ -484,18 +553,18 @@ int CurrentSense_alignStepperDriver(CurrentSense *cs, float voltage, FOCDriver* 
     // // phase B should be aligned
     // // 1) we just need to verify that it has been measured
     // if (fabs(c.b) < 0.1f ){
-    //     SIMPLEFOC_DEBUG("CS: Err too low current on B!");
+    //     TinyFOC_DEBUG("CS: Err too low current on B!");
     //     return 0; // measurement current too low
     // }
     // // 2) check if measured current a is positive and invert if not
     // if (c.b < 0){
-    //     SIMPLEFOC_DEBUG("CS: Inv B");
+    //     TinyFOC_DEBUG("CS: Inv B");
     //     gain_b *= -1;
     //     phases_inverted = true; // signal that pins have been inverted
     // }
 
     // // construct the return flag
-    // // if success and nothing changed return 1 
+    // // if success and nothing changed return 1
     // // if the phases have been switched return 2
     // // if the gains have been inverted return 3
     // // if both return 4
@@ -505,11 +574,8 @@ int CurrentSense_alignStepperDriver(CurrentSense *cs, float voltage, FOCDriver* 
     // return exit_flag;
 }
 
-
-
-
-
-int CurrentSense_alignHybridDriver(CurrentSense *cs, float voltage, FOCDriver* bldc_driver, bool modulation_centered){
+int CurrentSense_alignHybridDriver(CurrentSense *cs, float voltage, FOCDriver *bldc_driver, bool modulation_centered)
+{
 
     // _UNUSED(modulation_centered);
 
@@ -528,7 +594,7 @@ int CurrentSense_alignHybridDriver(CurrentSense *cs, float voltage, FOCDriver* b
     // // disable the phases
     // bldc_driver->setPwm(0, 0, 0);
     // if (fabs(c.a) < 0.1f && fabs(c.b) < 0.1f && fabs(c.c) < 0.1f ){
-    //     SIMPLEFOC_DEBUG("CS: Err too low current!");
+    //     TinyFOC_DEBUG("CS: Err too low current!");
     //     return 0; // measurement current too low
     // }
     // // find the highest magnitude in c
@@ -553,7 +619,7 @@ int CurrentSense_alignHybridDriver(CurrentSense *cs, float voltage, FOCDriver* b
     // if(max_c_ratio >=1.5f){
     //     switch (max_i){
     //         case 0: // phase A is the max current
-    //             SIMPLEFOC_DEBUG("CS: Switch A-C");
+    //             TinyFOC_DEBUG("CS: Switch A-C");
     //             // switch phase A and C
     //             _swap(pinA, pinC);
     //             _swap(offset_ia, offset_ic);
@@ -562,7 +628,7 @@ int CurrentSense_alignHybridDriver(CurrentSense *cs, float voltage, FOCDriver* b
     //             phases_switched = true; // signal that pins have been switched
     //             break;
     //         case 1: // phase B is the max current
-    //             SIMPLEFOC_DEBUG("CS: Switch B-C");
+    //             TinyFOC_DEBUG("CS: Switch B-C");
     //             // switch phase B and C
     //             _swap(pinB, pinC);
     //             _swap(offset_ib, offset_ic);
@@ -574,24 +640,24 @@ int CurrentSense_alignHybridDriver(CurrentSense *cs, float voltage, FOCDriver* b
     //     // check if the current is positive and invert the gain if so
     //     // current c should be negative
     //     if( _sign(c.c) > 0 ){
-    //         SIMPLEFOC_DEBUG("CS: Inv C");
+    //         TinyFOC_DEBUG("CS: Inv C");
     //         gain_c *= -1;
     //         phases_inverted = true; // signal that pins have been inverted
     //     }
     // }else{
     //     // c - middle phase is not measured
-    //     SIMPLEFOC_DEBUG("CS: Middle phase not measured!");
+    //     TinyFOC_DEBUG("CS: Middle phase not measured!");
     //     if(_isset(pinC)){
     //         // switch the missing phase with the phase C
     //         if(!_isset(pinA)){
-    //             SIMPLEFOC_DEBUG("CS: Switch (A)NC-C");
+    //             TinyFOC_DEBUG("CS: Switch (A)NC-C");
     //             _swap(pinA, pinC);
     //             _swap(offset_ia, offset_ic);
     //             _swap(gain_a, gain_c);
     //             _swap(c.a, c.c);
     //             phases_switched = true; // signal that pins have been switched
     //         }else if(!_isset(pinB)){
-    //             SIMPLEFOC_DEBUG("CS: Switch (B)NC-C");
+    //             TinyFOC_DEBUG("CS: Switch (B)NC-C");
     //             _swap(pinB, pinC);
     //             _swap(offset_ib, offset_ic);
     //             _swap(gain_b, gain_c);
@@ -620,7 +686,7 @@ int CurrentSense_alignHybridDriver(CurrentSense *cs, float voltage, FOCDriver* b
 
     // // check if currents are to low (lower than 100mA)
     // if((fabs(c.a) < 0.1f) && (fabs(c.b) < 0.1f) && (fabs(c.c) < 0.1f)){
-    //     SIMPLEFOC_DEBUG("CS: Err too low current, rise voltage!");
+    //     TinyFOC_DEBUG("CS: Err too low current, rise voltage!");
     //     return 0; // measurement current too low
     // }
 
@@ -629,7 +695,7 @@ int CurrentSense_alignHybridDriver(CurrentSense *cs, float voltage, FOCDriver* b
     // // 2) if the currents measured have good polarity
     // //
     // // > when we apply a voltage to a phase A of the driver what we expect to measure is the current I on the phase A
-    // //   and -I on the phase C 
+    // //   and -I on the phase C
 
     // // find the highest magnitude in A
     // // and make sure it's around the same as the C current (if the phase C is measured)
@@ -639,19 +705,19 @@ int CurrentSense_alignHybridDriver(CurrentSense *cs, float voltage, FOCDriver* b
     //     // if a and mid-phase c measured
     //     // verify that they have almost the same magnitude
     //     if((fabs(c.a) - fabs(c.c)) > 0.1f){
-    //         SIMPLEFOC_DEBUG("CS: Err A-C currents not equal!");
+    //         TinyFOC_DEBUG("CS: Err A-C currents not equal!");
     //         return 0;
     //     }
     // }else if(c.b && c.c){
     //     // if a and mid-phase c measured
     //     // verify that they have almost the same magnitude
     //     if((fabs(c.a) - fabs(c.c)) > 0.1f){
-    //         SIMPLEFOC_DEBUG("CS: Err B-C currents not equal!");
+    //         TinyFOC_DEBUG("CS: Err B-C currents not equal!");
     //         return 0;
     //     }else{
-    //         // if the current are equal 
-    //         // switch phase A and B 
-    //         SIMPLEFOC_DEBUG("CS: Switch A-B");
+    //         // if the current are equal
+    //         // switch phase A and B
+    //         TinyFOC_DEBUG("CS: Switch A-B");
     //         _swap(pinA, pinB);
     //         _swap(offset_ia, offset_ib);
     //         _swap(gain_a, gain_b);
@@ -661,13 +727,13 @@ int CurrentSense_alignHybridDriver(CurrentSense *cs, float voltage, FOCDriver* b
     // }else if(c.a && c.b){
     //     // check if one is significantly higher than the other
     //     if(fabs(fabs(c.a) - fabs(c.b)) < 0.1f){
-    //         SIMPLEFOC_DEBUG("CS: Err A-B currents zero!");
+    //         TinyFOC_DEBUG("CS: Err A-B currents zero!");
     //         return 0;
     //     }else{
     //         // if they are not equal take the highest as A
     //         if (fabs(c.a) < fabs(c.b)){
     //             // switch phase A and B
-    //             SIMPLEFOC_DEBUG("CS: Switch A-B");
+    //             TinyFOC_DEBUG("CS: Switch A-B");
     //             _swap(pinA, pinB);
     //             _swap(offset_ia, offset_ib);
     //             _swap(gain_a, gain_b);
@@ -680,11 +746,11 @@ int CurrentSense_alignHybridDriver(CurrentSense *cs, float voltage, FOCDriver* b
     // // if we get here, phase A is aligned
     // // check if the current is negative and invert the gain if so
     // if( _sign(c.a) < 0 ){
-    //     SIMPLEFOC_DEBUG("CS: Inv A");
+    //     TinyFOC_DEBUG("CS: Inv A");
     //     gain_a *= -1;
     //     phases_inverted = true; // signal that pins have been inverted
     // }
-    
+
     // // at this point the driver's phase A is aligned with the ADC pinA
     // // and the pin B should be the phase B
 
@@ -700,7 +766,7 @@ int CurrentSense_alignHybridDriver(CurrentSense *cs, float voltage, FOCDriver* b
 
     // // check if currents are to low (lower than 100mA)
     // if((fabs(c.a) < 0.1f) && (fabs(c.b) < 0.1f) && (fabs(c.c) < 0.1f)){
-    //     SIMPLEFOC_DEBUG("CS: Err too low current, rise voltage!");
+    //     TinyFOC_DEBUG("CS: Err too low current, rise voltage!");
     //     return 0; // measurement current too low
     // }
 
@@ -712,26 +778,26 @@ int CurrentSense_alignHybridDriver(CurrentSense *cs, float voltage, FOCDriver* b
     //     // if b and mid-phase c measured
     //     // verify that they have almost the same magnitude
     //     if((fabs(c.b) - fabs(c.c)) > 0.1f){
-    //         SIMPLEFOC_DEBUG("CS: Err B-C currents not equal!");
+    //         TinyFOC_DEBUG("CS: Err B-C currents not equal!");
     //         return 0;
     //     }
     // }else if(c.a && c.b){
     //     // check if one is significantly higher than the other
     //     if(fabs(fabs(c.a) - fabs(c.b)) < 0.1f){
-    //         SIMPLEFOC_DEBUG("CS: Err A-B currents zero!");
+    //         TinyFOC_DEBUG("CS: Err A-B currents zero!");
     //         return 0;
     //     }
     // }
 
     // // check if b has good polarity
     // if( _sign(c.b) < 0 ){
-    //     SIMPLEFOC_DEBUG("CS: Inv B");
+    //     TinyFOC_DEBUG("CS: Inv B");
     //     gain_b *= -1;
     //     phases_inverted = true; // signal that pins have been inverted
     // }
 
     // // construct the return flag
-    // // if success and nothing changed return 1 
+    // // if success and nothing changed return 1
     // // if the phases have been switched return 2
     // // if the gains have been inverted return 3
     // // if both return 4
@@ -740,5 +806,3 @@ int CurrentSense_alignHybridDriver(CurrentSense *cs, float voltage, FOCDriver* b
     // if(phases_inverted) exit_flag += 2;
     // return exit_flag;
 }
-
-

@@ -16,25 +16,24 @@
 #define MOT_WARN "WARN-MOT:"
 #define MOT_DEBUG "MOT:"
 
-#define SIMPLEFOC_DISABLE_DEBUG
 
-#ifndef SIMPLEFOC_DISABLE_DEBUG
-#define SIMPLEFOC_MOTOR_WARN(msg, ...)  \
-      SimpleFOCDebug::print(MOT_WARN); \
-      SIMPLEFOC_DEBUG(msg, ##__VA_ARGS__)
+#ifndef TinyFOC_DISABLE_DEBUG
+#define TinyFOC_MOTOR_WARN(msg, ...)  \
+      TinyFOCDebug::print(MOT_WARN); \
+      TinyFOC_DEBUG(msg, ##__VA_ARGS__)
 
-#define SIMPLEFOC_MOTOR_ERROR(msg, ...)  \
-      SimpleFOCDebug::print(MOT_ERR); \
-      SIMPLEFOC_DEBUG(msg, ##__VA_ARGS__)
+#define TinyFOC_MOTOR_ERROR(msg, ...)  \
+      TinyFOCDebug::print(MOT_ERR); \
+      TinyFOC_DEBUG(msg, ##__VA_ARGS__)
 
-#define SIMPLEFOC_MOTOR_DEBUG(msg, ...)  \
-      SimpleFOCDebug::print(MOT_DEBUG); \
-      SIMPLEFOC_DEBUG(msg, ##__VA_ARGS__)
+#define TinyFOC_MOTOR_DEBUG(msg, ...)  \
+      TinyFOCDebug::print(MOT_DEBUG); \
+      TinyFOC_DEBUG(msg, ##__VA_ARGS__)
       
 #else
-#define SIMPLEFOC_MOTOR_DEBUG(msg, ...)
-#define SIMPLEFOC_MOTOR_ERROR(msg, ...)
-#define SIMPLEFOC_MOTOR_WARN(msg, ...)
+#define TinyFOC_MOTOR_DEBUG(msg, ...)
+#define TinyFOC_MOTOR_ERROR(msg, ...)
+#define TinyFOC_MOTOR_WARN(msg, ...)
 #endif
 
 // monitoring bitmap
@@ -164,6 +163,12 @@ typedef struct s_FOCMotor{
    */
   void (*linkCurrentSense)(struct s_FOCMotor *motor, CurrentSense* current_sense);
 
+  /**
+   * Function linking a motor and a foc driver
+   *
+   * @param driver BLDCDriver class implementing all the hardware specific functions necessary PWM setting
+   */
+  void (*linkDriver)(struct s_BLDCMotor *motor, FOCDriver *driver);
 
   // State calculation methods 
   /** Shaft angle calculation in radians [rad] */
@@ -263,6 +268,10 @@ typedef struct s_FOCMotor{
   enum Direction sensor_direction; //!< default is CW. if sensor_direction == Direction::CCW then direction will be flipped compared to CW. Set to UNKNOWN to set by calibration
   bool pp_check_result; //!< the result of the PP check, if run during loopFOC
 
+  float Ua, Ub, Uc; //!< Current phase voltages Ua,Ub and Uc set to motor
+
+  FOCDriver *driver; //!< FOCDriver instance
+
   /**
    * Function providing BLDCMotor class with the 
    * Serial interface and enabling monitoring mode
@@ -356,7 +365,7 @@ void FOCMotor_updateVoltageLimit(FOCMotor *motor, float new_voltage_limit);
  * 
  * @note Updates motor.torque_controller and motor.PID_velocity.limit
  */
-void FOCMotor_updateTorqueControlType(FOCMotor *motor, TorqueControlType new_torque_controller);
+void FOCMotor_updateTorqueControlType(FOCMotor *motor, enum TorqueControlType new_torque_controller);
 /**
  * Update motion control type and related target values
  * @param new_motion_controller - new motion control type
@@ -366,7 +375,7 @@ void FOCMotor_updateTorqueControlType(FOCMotor *motor, TorqueControlType new_tor
  * - if angle control: target is set to the current shaft_angle
  * - if torque control: target is set to 0V or 0A depending on torque control type
  */
-void FOCMotor_updateMotionControlType(FOCMotor *motor, MotionControlType new_motion_controller);
+void FOCMotor_updateMotionControlType(FOCMotor *motor, enum MotionControlType new_motion_controller);
 
 // Open loop motion control    
 /**

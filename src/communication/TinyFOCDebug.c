@@ -1,24 +1,24 @@
 
-#include "SimpleFOCDebug.h"
+#include "TinyFOCDebug.h"
 #include "stdint.h"
-#ifndef SIMPLEFOC_DISABLE_DEBUG
+#ifndef TinyFOC_DISABLE_DEBUG
 
 
 Print* _debugPrint = NULL;
 
 
-void SimpleFOCDebug_enable(Print* debugPrint) {
+void TinyFOCDebug_enable(Print* debugPrint) {
     _debugPrint = debugPrint;
 }
 
 
-void SimpleFOCDebug_println(int val) {
+void TinyFOCDebug_println(int val) {
     if (_debugPrint != NULL) {
         _debugPrint->println(val);
     }
 }
 
-void SimpleFOCDebug::println(float val) {
+void TinyFOCDebug::println(float val) {
     if (_debugPrint != NULL) {
         _debugPrint->println(val);
     }
@@ -26,75 +26,75 @@ void SimpleFOCDebug::println(float val) {
 
 
 
-void SimpleFOCDebug::println(const char* str) {
+void TinyFOCDebug::println(const char* str) {
     if (_debugPrint != NULL) {
         _debugPrint->println(str);
     }
 }
 
-void SimpleFOCDebug::println(const __FlashStringHelper* str) {
+void TinyFOCDebug::println(const __FlashStringHelper* str) {
     if (_debugPrint != NULL) {
         _debugPrint->println(str);
     }
 }
 
 
-void SimpleFOCDebug::println(const char* str, float val) {
+void TinyFOCDebug::println(const char* str, float val) {
     if (_debugPrint != NULL) {
         _debugPrint->print(str);
         _debugPrint->println(val);
     }
 }
 
-void SimpleFOCDebug::println(const __FlashStringHelper* str, float val) {
+void TinyFOCDebug::println(const __FlashStringHelper* str, float val) {
     if (_debugPrint != NULL) {
         _debugPrint->print(str);
         _debugPrint->println(val);
     }
 }
 
-void SimpleFOCDebug::println(const char* str, int val) {
+void TinyFOCDebug::println(const char* str, int val) {
     if (_debugPrint != NULL) {
         _debugPrint->print(str);
         _debugPrint->println(val);
     }
 }
-void SimpleFOCDebug::println(const char* str, char val) {
-    if (_debugPrint != NULL) {
-        _debugPrint->print(str);
-        _debugPrint->println(val);
-    }
-}
-
-void SimpleFOCDebug::println(const __FlashStringHelper* str, int val) {
+void TinyFOCDebug::println(const char* str, char val) {
     if (_debugPrint != NULL) {
         _debugPrint->print(str);
         _debugPrint->println(val);
     }
 }
 
+void TinyFOCDebug::println(const __FlashStringHelper* str, int val) {
+    if (_debugPrint != NULL) {
+        _debugPrint->print(str);
+        _debugPrint->println(val);
+    }
+}
 
-void SimpleFOCDebug::print(const char* str) {
+
+void TinyFOCDebug::print(const char* str) {
     if (_debugPrint != NULL) {
         _debugPrint->print(str);
     }
 }
 
 
-void SimpleFOCDebug::print(const __FlashStringHelper* str) {
+void TinyFOCDebug::print(const __FlashStringHelper* str) {
     if (_debugPrint != NULL) {
         _debugPrint->print(str);
     }
 }
 
-void SimpleFOCDebug::print(const StringSumHelper str) {
+void TinyFOCDebug::print(const StringSumHelper str) {
     if (_debugPrint != NULL) {
         _debugPrint->print(str.c_str());
     }
 }
 
 
-void SimpleFOCDebug::println(const StringSumHelper str) {
+void TinyFOCDebug::println(const StringSumHelper str) {
     if (_debugPrint != NULL) {
         _debugPrint->println(str.c_str());
     }
@@ -102,21 +102,21 @@ void SimpleFOCDebug::println(const StringSumHelper str) {
 
 
 
-void SimpleFOCDebug::print(int val) {
+void TinyFOCDebug::print(int val) {
     if (_debugPrint != NULL) {
         _debugPrint->print(val);
     }
 }
 
 
-void SimpleFOCDebug::print(float val) {
+void TinyFOCDebug::print(float val) {
     if (_debugPrint != NULL) {
         _debugPrint->print(val);
     }
 }
 
 
-void SimpleFOCDebug::println() {
+void TinyFOCDebug::println() {
     if (_debugPrint != NULL) {
         _debugPrint->println();
     }

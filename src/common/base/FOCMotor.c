@@ -38,6 +38,14 @@ void default_linkSensor(FOCMotor *motor, Sensor *_sensor)
 }
 
 /**
+    Driver linking method
+*/
+void default_linkDriver(FOCMotor *motor, FOCDriver *_driver)
+{
+    motor->driver = _driver;
+}
+
+/**
  CurrentSense linking method
  */
 void default_linkCurrentSense(FOCMotor *motor, CurrentSense *_current_sense)
@@ -78,9 +86,9 @@ float default_electricalAngle(FOCMotor *motor)
 void default_useMonitoring(FOCMotor *motor, Print *print)
 {
     motor->monitor_port = &print; // operate on the address of print
-    //   #ifndef SIMPLEFOC_DISABLE_DEBUG
-    //   SimpleFOCDebug::enable(&print);
-    //   SIMPLEFOC_MOTOR_DEBUG("Monitor enabled!");
+    //   #ifndef TinyFOC_DISABLE_DEBUG
+    //   TinyFOCDebug::enable(&print);
+    //   TinyFOC_MOTOR_DEBUG("Monitor enabled!");
     //   #endif
 }
 
@@ -89,18 +97,18 @@ int default_characteriseMotor(FOCMotor *motor, float voltage, float correction_f
 {
     if (!motor->current_sense || !motor->current_sense->initialized)
     {
-        SIMPLEFOC_MOTOR_ERROR("Fail. CS not init.");
+        TinyFOC_MOTOR_ERROR("Fail. CS not init.");
         return 1;
     }
 
     if (voltage <= 0.0f)
     {
-        SIMPLEFOC_MOTOR_ERROR("Fail. Volt. <= 0");
+        TinyFOC_MOTOR_ERROR("Fail. Volt. <= 0");
         return 2;
     }
     voltage = _constrain(voltage, 0.0f, motor->voltage_limit);
 
-    SIMPLEFOC_MOTOR_DEBUG("Meas R..");
+    TinyFOC_MOTOR_DEBUG("Meas R..");
 
     float current_electric_angle = motor->electricalAngle(motor);
 
@@ -128,22 +136,22 @@ int default_characteriseMotor(FOCMotor *motor, float voltage, float correction_f
 
     if (fabsf(r_currents.d - zerocurrent.d) < 0.2f)
     {
-        SIMPLEFOC_MOTOR_ERROR("Fail. current too low");
+        TinyFOC_MOTOR_ERROR("Fail. current too low");
         return 3;
     }
 
     float resistance = voltage / (correction_factor * (r_currents.d - zerocurrent.d));
     if (resistance <= 0.0f)
     {
-        SIMPLEFOC_MOTOR_ERROR("Fail. Est. R<= 0");
+        TinyFOC_MOTOR_ERROR("Fail. Est. R<= 0");
         return 4;
     }
 
-    SIMPLEFOC_MOTOR_DEBUG("Est. R: ", 2.0f * resistance);
+    TinyFOC_MOTOR_DEBUG("Est. R: ", 2.0f * resistance);
     _delay(100);
 
     // Start inductance measurement
-    SIMPLEFOC_MOTOR_DEBUG("Meas L...");
+    TinyFOC_MOTOR_DEBUG("Meas L...");
 
     unsigned long t0 = 0;
     unsigned long t1 = 0;
@@ -212,7 +220,7 @@ int default_characteriseMotor(FOCMotor *motor, float voltage, float correction_f
             Ltemp = i < 2 ? inductanced : Ltemp * 0.6 + inductanced * 0.4;
 
             float timeconstant = fabsf(Ltemp / resistance); // Timeconstant of an RL circuit (L/R)
-            // SIMPLEFOC_MOTOR_DEBUG("Estimated time constant in us: ", 1000000.0f * timeconstant);
+            // TinyFOC_MOTOR_DEBUG("Estimated time constant in us: ", 1000000.0f * timeconstant);
 
             // Wait as long as possible (due to limited timing accuracy & sample rate), but as short as needed (while the current still changes)
             risetime_us = _constrain(risetime_us * 0.6f + 0.4f * 1000000 * 0.6f * timeconstant, 100, 10000);
@@ -282,19 +290,19 @@ int default_characteriseMotor(FOCMotor *motor, float voltage, float correction_f
             estimated_zero_electric_angle = estimated_zero_electric_angle_B;
         }
 
-        SIMPLEFOC_MOTOR_DEBUG("New el. zero: ", estimated_zero_electric_angle);
-        SIMPLEFOC_MOTOR_DEBUG("Curr. el. zero: ", motor->zero_electric_angle);
+        TinyFOC_MOTOR_DEBUG("New el. zero: ", estimated_zero_electric_angle);
+        TinyFOC_MOTOR_DEBUG("Curr. el. zero: ", motor->zero_electric_angle);
     }
 
-    SIMPLEFOC_MOTOR_DEBUG("Ld [mH]: ", Ld * 1000.0f);
-    SIMPLEFOC_MOTOR_DEBUG("Lq [mH]: ", Lq * 1000.0f);
+    TinyFOC_MOTOR_DEBUG("Ld [mH]: ", Ld * 1000.0f);
+    TinyFOC_MOTOR_DEBUG("Lq [mH]: ", Lq * 1000.0f);
     if (Ld > Lq)
     {
-        SIMPLEFOC_MOTOR_WARN("Ld>Lq. Likely error.");
+        TinyFOC_MOTOR_WARN("Ld>Lq. Likely error.");
     }
     if (Ld * 2.0f < Lq)
     {
-        SIMPLEFOC_MOTOR_WARN("Lq > 2*Ld. Likely error.");
+        TinyFOC_MOTOR_WARN("Lq > 2*Ld. Likely error.");
     }
 
     // store the measured values
@@ -637,9 +645,9 @@ void FOCMotor_updateMotionControlType(FOCMotor *motor, enum MotionControlType ne
     // finally set the new controller
     motor->controller = new_motion_controller;
     // update limits in case they need to be changed for the new controller
-    updateVelocityLimit(motor->velocity_limit);
-    updateCurrentLimit(motor->current_limit);
-    updateVoltageLimit(motor->voltage_limit);
+    FOCMotor_updateVelocityLimit(motor, motor->velocity_limit);
+    FOCMotor_updateCurrentLimit(motor, motor->current_limit);
+    FOCMotor_updateVoltageLimit(motor, motor->voltage_limit);
 }
 
 int FOCMotor_tuneCurrentController(FOCMotor *motor, float bandwidth)
@@ -647,19 +655,19 @@ int FOCMotor_tuneCurrentController(FOCMotor *motor, float bandwidth)
     if (bandwidth <= 0.0f)
     {
         // check bandwidth is positive
-        SIMPLEFOC_MOTOR_ERROR("Fail. BW <= 0");
+        TinyFOC_MOTOR_ERROR("Fail. BW <= 0");
         return 1;
     }
     if (motor->loopfoc_time_us && bandwidth > 0.5f * (1e6f / motor->loopfoc_time_us))
     {
         // check bandwidth is not too high for the control loop frequency
-        SIMPLEFOC_MOTOR_ERROR("Fail. BW too high, current loop freq:", (1e6f / loopfoc_time_us));
+        TinyFOC_MOTOR_ERROR("Fail. BW too high, current loop freq:", (1e6f / loopfoc_time_us));
         return 2;
     }
     if (!_isset(motor->phase_resistance) || (!_isset(motor->phase_inductance) && !_isset(motor->axis_inductance.q)))
     {
         // need motor parameters to tune the controller
-        SIMPLEFOC_MOTOR_WARN("Motor params missing!");
+        TinyFOC_MOTOR_WARN("Motor params missing!");
         if (motor->characteriseMotor(motor, motor->voltage_sensor_align, 1.5))
         {
             return 3;
@@ -679,11 +687,11 @@ int FOCMotor_tuneCurrentController(FOCMotor *motor, float bandwidth)
     motor->LPF_current_d.Tf = 1.0f / (_2PI * bandwidth * 5.0f); // filter cutoff at 5x bandwidth
     motor->LPF_current_q.Tf = 1.0f / (_2PI * bandwidth * 5.0f); // filter cutoff at 5x bandwidth
 
-    SIMPLEFOC_MOTOR_DEBUG("Tuned PI params for BW [Hz]: ", bandwidth);
-    SIMPLEFOC_MOTOR_DEBUG("Pq: ", motor->PID_current_q.P);
-    SIMPLEFOC_MOTOR_DEBUG("Iq: ", motor->PID_current_q.I);
-    SIMPLEFOC_MOTOR_DEBUG("Pd: ", motor->PID_current_d.P);
-    SIMPLEFOC_MOTOR_DEBUG("Id: ", motor->PID_current_d.I);
+    TinyFOC_MOTOR_DEBUG("Tuned PI params for BW [Hz]: ", bandwidth);
+    TinyFOC_MOTOR_DEBUG("Pq: ", motor->PID_current_q.P);
+    TinyFOC_MOTOR_DEBUG("Iq: ", motor->PID_current_q.I);
+    TinyFOC_MOTOR_DEBUG("Pd: ", motor->PID_current_d.P);
+    TinyFOC_MOTOR_DEBUG("Id: ", motor->PID_current_d.I);
 
     return 0;
 }
@@ -786,7 +794,7 @@ void FOCMotor_loopFOC(FOCMotor *motor)
         break;
     default:
         // no torque control selected
-        SIMPLEFOC_MOTOR_ERROR("no torque control selected!");
+        TinyFOC_MOTOR_ERROR("no torque control selected!");
         break;
     }
     // set the phase voltage - FOC heart function :)
@@ -923,14 +931,14 @@ int FOCMotor_initFOC(FOCMotor *motor)
     }
     else
     {
-        SIMPLEFOC_MOTOR_DEBUG("No sensor.");
+        TinyFOC_MOTOR_DEBUG("No sensor.");
         if ((motor->controller == MotionControlType_angle_openloop || motor->controller == MotionControlType_velocity_openloop))
         {
             exit_flag = 1;
         }
         else
         {
-            SIMPLEFOC_MOTOR_ERROR("Only openloop allowed!");
+            TinyFOC_MOTOR_ERROR("Only openloop allowed!");
             exit_flag = 0; // no FOC without sensor
         }
     }
@@ -945,7 +953,7 @@ int FOCMotor_initFOC(FOCMotor *motor)
             if (!motor->current_sense->initialized)
             {
                 motor->motor_status = FOCMotorStatus_calib_failed;
-                SIMPLEFOC_MOTOR_ERROR("Current sense not init!");
+                TinyFOC_MOTOR_ERROR("Current sense not init!");
                 exit_flag = 0;
             }
             else
@@ -955,18 +963,18 @@ int FOCMotor_initFOC(FOCMotor *motor)
         }
         else
         {
-            SIMPLEFOC_MOTOR_ERROR("No current sense.");
+            TinyFOC_MOTOR_ERROR("No current sense.");
         }
     }
 
     if (exit_flag)
     {
-        SIMPLEFOC_MOTOR_DEBUG("Ready.");
+        TinyFOC_MOTOR_DEBUG("Ready.");
         motor->motor_status = FOCMotorStatus_ready;
     }
     else
     {
-        SIMPLEFOC_MOTOR_ERROR("Init FOC fail");
+        TinyFOC_MOTOR_ERROR("Init FOC fail");
         motor->motor_status = FOCMotorStatus_calib_failed;
         disable();
     }
@@ -979,20 +987,20 @@ int FOCMotor_alignCurrentSense(FOCMotor *motor)
 {
     int exit_flag = 1; // success
 
-    SIMPLEFOC_MOTOR_DEBUG("Align current sense.");
+    TinyFOC_MOTOR_DEBUG("Align current sense.");
 
     // align current sense and the driver
     exit_flag = motor->current_sense->driverAlign(motor->current_sense, motor->voltage_sensor_align, motor->modulation_centered);
     if (!exit_flag)
     {
         // error in current sense - phase either not measured or bad connection
-        SIMPLEFOC_MOTOR_ERROR("Align error!");
+        TinyFOC_MOTOR_ERROR("Align error!");
         exit_flag = 0;
     }
     else
     {
         // output the alignment status flag
-        SIMPLEFOC_MOTOR_DEBUG("Success: ", exit_flag);
+        TinyFOC_MOTOR_DEBUG("Success: ", exit_flag);
     }
 
     return exit_flag > 0;
@@ -1002,7 +1010,7 @@ int FOCMotor_alignCurrentSense(FOCMotor *motor)
 int FOCMotor_alignSensor(FOCMotor *motor)
 {
     int exit_flag = 1; // success
-    SIMPLEFOC_MOTOR_DEBUG("Align sensor.");
+    TinyFOC_MOTOR_DEBUG("Align sensor.");
 
     // check if sensor needs zero search
     if (motor->sensor->needsSearch(motor->sensor))
@@ -1047,32 +1055,32 @@ int FOCMotor_alignSensor(FOCMotor *motor)
         float moved = fabs(mid_angle - end_angle);
         if (moved < MIN_ANGLE_DETECT_MOVEMENT)
         { // minimum angle to detect movement
-            SIMPLEFOC_MOTOR_ERROR("Failed to notice movement");
+            TinyFOC_MOTOR_ERROR("Failed to notice movement");
             return 0; // failed calibration
         }
         else if (mid_angle < end_angle)
         {
-            SIMPLEFOC_MOTOR_DEBUG("sensor dir: CCW");
+            TinyFOC_MOTOR_DEBUG("sensor dir: CCW");
             motor->sensor_direction = Direction_CCW;
         }
         else
         {
-            SIMPLEFOC_MOTOR_DEBUG("sensor dir: CW");
+            TinyFOC_MOTOR_DEBUG("sensor dir: CW");
             motor->sensor_direction = Direction_CW;
         }
         // check pole pair number
         motor->pp_check_result = !(fabs(moved * motor->pole_pairs - _2PI) > 0.5f); // 0.5f is arbitrary number it can be lower or higher!
         if (motor->pp_check_result == false)
         {
-            SIMPLEFOC_MOTOR_WARN("PP check: fail - est. pp: ", _2PI / moved);
+            TinyFOC_MOTOR_WARN("PP check: fail - est. pp: ", _2PI / moved);
         }
         else
         {
-            SIMPLEFOC_MOTOR_DEBUG("PP check: OK!");
+            TinyFOC_MOTOR_DEBUG("PP check: OK!");
         }
     }
     else
-        SIMPLEFOC_MOTOR_DEBUG("Skip dir calib.");
+        TinyFOC_MOTOR_DEBUG("Skip dir calib.");
 
     // zero electric angle not known
     if (!_isset(motor->zero_electric_angle))
@@ -1087,14 +1095,14 @@ int FOCMotor_alignSensor(FOCMotor *motor)
         motor->zero_electric_angle = 0;
         motor->zero_electric_angle = motor->electricalAngle(motor);
         _delay(20);
-        SIMPLEFOC_MOTOR_DEBUG("Zero elec. angle: ", motor->zero_electric_angle);
+        TinyFOC_MOTOR_DEBUG("Zero elec. angle: ", motor->zero_electric_angle);
         // stop everything
         motor->setPhaseVoltage(motor, 0, 0, 0);
         _delay(200);
     }
     else
     {
-        SIMPLEFOC_MOTOR_DEBUG("Skip offset calib.");
+        TinyFOC_MOTOR_DEBUG("Skip offset calib.");
     }
     return exit_flag;
 }
@@ -1105,7 +1113,7 @@ int FOCMotor_absoluteZeroSearch(FOCMotor *motor)
 {
     // sensor precision: this is all ok, as the search happens near the 0-angle, where the precision
     //                    of float is sufficient.
-    SIMPLEFOC_MOTOR_DEBUG("Index search...");
+    TinyFOC_MOTOR_DEBUG("Index search...");
     // search the absolute zero with small velocity
     float limit_vel = motor->velocity_limit;
     float limit_volt = motor->voltage_limit;
@@ -1129,11 +1137,11 @@ int FOCMotor_absoluteZeroSearch(FOCMotor *motor)
     {
         if (motor->sensor->needsSearch(motor->sensor))
         {
-            SIMPLEFOC_MOTOR_ERROR("Not found!");
+            TinyFOC_MOTOR_ERROR("Not found!");
         }
         else
         {
-            SIMPLEFOC_MOTOR_DEBUG("Success!");
+            TinyFOC_MOTOR_DEBUG("Success!");
         }
     }
     return !motor->sensor->needsSearch(motor->sensor);
