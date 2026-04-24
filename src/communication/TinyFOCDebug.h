@@ -41,8 +41,6 @@ void TinyFOCDebug_println_f(const char* msg, float val);
 void TinyFOCDebug_println_i(const char* msg, int val);
 void TinyFOCDebug_println_c(const char* msg, char val);
 void TinyFOCDebug_println();
-void TinyFOCDebug_println_i(int val);
-void TinyFOCDebug_println_f(float val);
 void TinyFOCDebug_print_s(const char* msg);
 void TinyFOCDebug_print_i(int val);
 void TinyFOCDebug_print_f(float val);
@@ -57,7 +55,7 @@ void TinyFOCDebug_print_f(float val);
 #define TinyFOC_DEBUG_f(msg, val) \
     TinyFOCDebug_println_f(msg, val)
 
-#define TinyFOC_DEBUG_i(msg, str) \
+#define TinyFOC_DEBUG_i(msg, val) \
     TinyFOCDebug_println_i(msg, val)
 #else  //ifndef TinyFOC_DISABLE_DEBUG
  

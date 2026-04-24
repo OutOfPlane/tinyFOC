@@ -77,6 +77,25 @@ typedef struct Phase_s PhaseCurrent_s;
  * @param a angle in between 0 and 2PI
  */
 float _sin(float a);
+
+
+/**
+ *  get the absolute value
+ *
+ * @param a any float
+ */
+float _abs(float a);
+
+/**
+ *  get the log value
+ *
+ * @param a any float
+ */
+float _log(float a);
+
+#define min(X, Y) (X > Y ? Y : X)
+#define max(X, Y) (X > Y ? X : Y)
+
 /**
  * Function approximating cosine calculation by using fixed size array
  * - execution time ~50us (Arduino UNO)

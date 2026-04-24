@@ -6,8 +6,7 @@
 #include "../common/time_utils.h"
 #include "stdbool.h"
 
-// seq 1 > 5 > 4 > 6 > 2 > 3 > 1     000 001 010 011 100 101 110 111
-const int8_t ELECTRIC_SECTORS[8] = {-1, 0, 4, 5, 2, 1, 3, -1};
+
 
 typedef struct s_HallSensor_ll{
        void (*init)(struct s_HallSensor_ll *ll);
@@ -40,6 +39,7 @@ typedef struct s_HallSensor
 
   // variable used to filter outliers - rad/s
   float velocity_max;
+  float angle_cache; // used to store the last angle value for outlier filtering
 
   volatile unsigned long pulse_timestamp; //!< last impulse timestamp in us
   volatile long pulse_diff;

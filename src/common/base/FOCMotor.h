@@ -11,29 +11,42 @@
 #include "../defaults.h"
 #include "../pid.h"
 #include "../lowpass_filter.h"
+#include "communication/TinyFOCDebug.h"
 
 #define MOT_ERR "ERR-MOT:"
 #define MOT_WARN "WARN-MOT:"
 #define MOT_DEBUG "MOT:"
 
+// 1. Define the actual implementations for 1 and 2 arguments
+#define MYMACRO_1(X)      TinyFOC_DEBUG(X)
+#define MYMACRO_2(X, Y)   TinyFOC_DEBUG_f(X, Y)
+
+// 2. A helper to pick the Nth argument
+#define GET_3RD_ARG(arg1, arg2, arg3, ...) arg3
+
+// 3. The dispatcher
+// It places the implementation names in the 1st and 2nd slots.
+// The __VA_ARGS__ shift the "name" we want into the 3rd slot.
+#define varargprint(...) GET_3RD_ARG(__VA_ARGS__, MYMACRO_2, MYMACRO_1)(__VA_ARGS__)
+
 
 #ifndef TinyFOC_DISABLE_DEBUG
-#define TinyFOC_MOTOR_WARN(msg, ...)  \
-      TinyFOCDebug::print(MOT_WARN); \
-      TinyFOC_DEBUG(msg, ##__VA_ARGS__)
+#define TinyFOC_MOTOR_WARN(...)  \
+      TinyFOC_DEBUG(MOT_WARN); \
+      varargprint(__VA_ARGS__)
 
-#define TinyFOC_MOTOR_ERROR(msg, ...)  \
-      TinyFOCDebug::print(MOT_ERR); \
-      TinyFOC_DEBUG(msg, ##__VA_ARGS__)
+#define TinyFOC_MOTOR_ERROR(...)  \
+      TinyFOC_DEBUG(MOT_ERR); \
+      varargprint(__VA_ARGS__)
 
-#define TinyFOC_MOTOR_DEBUG(msg, ...)  \
-      TinyFOCDebug::print(MOT_DEBUG); \
-      TinyFOC_DEBUG(msg, ##__VA_ARGS__)
+#define TinyFOC_MOTOR_DEBUG(...)  \
+      TinyFOC_DEBUG(MOT_DEBUG); \
+      varargprint(__VA_ARGS__)
       
 #else
-#define TinyFOC_MOTOR_DEBUG(msg, ...)
-#define TinyFOC_MOTOR_ERROR(msg, ...)
-#define TinyFOC_MOTOR_WARN(msg, ...)
+#define TinyFOC_MOTOR_DEBUG(...)
+#define TinyFOC_MOTOR_ERROR(...)
+#define TinyFOC_MOTOR_WARN(...)
 #endif
 
 // monitoring bitmap
@@ -168,7 +181,7 @@ typedef struct s_FOCMotor{
    *
    * @param driver BLDCDriver class implementing all the hardware specific functions necessary PWM setting
    */
-  void (*linkDriver)(struct s_BLDCMotor *motor, FOCDriver *driver);
+  void (*linkDriver)(struct s_FOCMotor *motor, FOCDriver *driver);
 
   // State calculation methods 
   /** Shaft angle calculation in radians [rad] */
@@ -296,6 +309,7 @@ typedef struct s_FOCMotor{
   uint8_t monitor_variables; //!< Bit array holding the map of variables the user wants to monitor
   // monitor counting variable
   unsigned int monitor_cnt; //!< counting variable
+
   
   /** 
     * Sensor link:

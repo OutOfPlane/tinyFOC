@@ -5,7 +5,7 @@
 // get current magnitude
 //   - absolute  - if no electrical_angle provided
 //   - signed    - if angle provided
-float default_getDCCurrent(CurrentSense *cs, float motor_electrical_angle)
+static float default_getDCCurrent(CurrentSense *cs, float motor_electrical_angle)
 {
     // read current phase currents
     PhaseCurrent_s current = cs->getPhaseCurrents(cs);
@@ -14,7 +14,7 @@ float default_getDCCurrent(CurrentSense *cs, float motor_electrical_angle)
     ABCurrent_s ABcurrent = CurrentSense_getABCurrents(cs, current);
 
     // current sign - if motor angle not provided the magnitude is always positive
-    float sign = 1;
+    int sign = 1;
 
     // if motor angle provided function returns signed value of the current
     // determine the sign of the current
@@ -27,19 +27,19 @@ float default_getDCCurrent(CurrentSense *cs, float motor_electrical_angle)
         sign = (ABcurrent.beta * ct - ABcurrent.alpha * st) > 0 ? 1 : -1;
     }
     // return current magnitude
-    return sign * _sqrt(ABcurrent.alpha * ABcurrent.alpha + ABcurrent.beta * ABcurrent.beta);
+    return _sqrt(ABcurrent.alpha * ABcurrent.alpha + ABcurrent.beta * ABcurrent.beta) * sign;
 }
 
-void default_enable(CurrentSense *cs) {
+static void default_enable(CurrentSense *cs) {
     // nothing is done here, but you can override this function
 };
 
-void default_disable(CurrentSense *cs) {
+static void default_disable(CurrentSense *cs) {
     // nothing is done here, but you can override this function
 };
 
 // Function finding zero offsets of the ADC
-void calibrateOffsets(CurrentSense *cs)
+static void calibrateOffsets(CurrentSense *cs)
 {
     const int calibration_rounds = 1000;
 
@@ -64,7 +64,7 @@ void calibrateOffsets(CurrentSense *cs)
 }
 
 // Inline sensor init function
-int default_init(CurrentSense *cs)
+static int default_init(CurrentSense *cs)
 {
     // configure ADC variables
     if (cs->ll != NULL && cs->ll->init != NULL)
@@ -77,7 +77,7 @@ int default_init(CurrentSense *cs)
 }
 
 // read all three phase currents (if possible 2 or 3)
-PhaseCurrent_s default_getPhaseCurrents(CurrentSense *cs)
+static PhaseCurrent_s default_getPhaseCurrents(CurrentSense *cs)
 {
     PhaseCurrent_s current;
     cs->ll->readcurrents(cs->ll, &current.a, &current.b, &current.c);
@@ -87,50 +87,6 @@ PhaseCurrent_s default_getPhaseCurrents(CurrentSense *cs)
     return current;
 }
 
-// Function aligning the current sense with motor driver
-// if all pins are connected well none of this is really necessary! - can be avoided
-// returns flag
-// 0 - fail
-// 1 - success and nothing changed
-// 2 - success but pins reconfigured
-// 3 - success but gains inverted
-// 4 - success but pins reconfigured and gains inverted
-// IMPORTANT, this function can be overriden in the child class
-int default_driverAlign(CurrentSense *cs, float voltage, bool modulation_centered)
-{
-
-    int exit_flag = 1;
-    if (cs->skip_align)
-        return exit_flag;
-
-    if (!cs->initialized)
-        return 0;
-
-    // check if stepper or BLDC
-    switch (cs->driver_type)
-    {
-    case DriverType_BLDC:
-        return alignBLDCDriver(voltage, cs->driver, modulation_centered);
-    case DriverType_Stepper:
-        return alignStepperDriver(voltage, cs->driver, modulation_centered);
-    case DriverType_Hybrid:
-        return alignHybridDriver(voltage, cs->driver, modulation_centered);
-    default:
-        // driver type not supported
-        TinyFOC_DEBUG("CS: Cannot align driver type!");
-        return 0;
-    }
-}
-
-void CurrentSense_load_default(CurrentSense *cs)
-{
-    cs->init = default_init;
-    cs->driverAlign = default_driverAlign;
-    cs->getPhaseCurrents = default_getPhaseCurrents;
-    cs->getDCCurrent = default_getDCCurrent;
-    cs->enable = default_enable;
-    cs->disable = default_disable;
-}
 
 // function used with the foc algorithm
 //   calculating DQ currents from phase currents
@@ -275,7 +231,7 @@ PhaseCurrent_s CurrentSense_readAverageCurrents(CurrentSense *cs, int N)
 // 2 - success but pins reconfigured
 // 3 - success but gains inverted
 // 4 - success but pins reconfigured and gains inverted
-int CurrentSense_alignBLDCDriver(CurrentSense *cs, float voltage, FOCDriver *bldc_driver, bool modulation_centered)
+static int CurrentSense_alignBLDCDriver(CurrentSense *cs, float voltage, FOCDriver *bldc_driver, bool modulation_centered)
 {
 
     // bool phases_switched = 0;
@@ -492,7 +448,7 @@ int CurrentSense_alignBLDCDriver(CurrentSense *cs, float voltage, FOCDriver *bld
 // 2 - success but pins reconfigured
 // 3 - success but gains inverted
 // 4 - success but pins reconfigured and gains inverted
-int CurrentSense_alignStepperDriver(CurrentSense *cs, float voltage, FOCDriver *stepper_driver, bool modulation_centered)
+static int CurrentSense_alignStepperDriver(CurrentSense *cs, float voltage, FOCDriver *stepper_driver, bool modulation_centered)
 {
 
     // _UNUSED(modulation_centered);
@@ -574,7 +530,7 @@ int CurrentSense_alignStepperDriver(CurrentSense *cs, float voltage, FOCDriver *
     // return exit_flag;
 }
 
-int CurrentSense_alignHybridDriver(CurrentSense *cs, float voltage, FOCDriver *bldc_driver, bool modulation_centered)
+static int CurrentSense_alignHybridDriver(CurrentSense *cs, float voltage, FOCDriver *bldc_driver, bool modulation_centered)
 {
 
     // _UNUSED(modulation_centered);
@@ -805,4 +761,51 @@ int CurrentSense_alignHybridDriver(CurrentSense *cs, float voltage, FOCDriver *b
     // if(phases_switched) exit_flag += 1;
     // if(phases_inverted) exit_flag += 2;
     // return exit_flag;
+}
+
+
+
+// Function aligning the current sense with motor driver
+// if all pins are connected well none of this is really necessary! - can be avoided
+// returns flag
+// 0 - fail
+// 1 - success and nothing changed
+// 2 - success but pins reconfigured
+// 3 - success but gains inverted
+// 4 - success but pins reconfigured and gains inverted
+// IMPORTANT, this function can be overriden in the child class
+static int default_driverAlign(CurrentSense *cs, float voltage, bool modulation_centered)
+{
+
+    int exit_flag = 1;
+    if (cs->skip_align)
+        return exit_flag;
+
+    if (!cs->initialized)
+        return 0;
+
+    // check if stepper or BLDC
+    switch (cs->driver_type)
+    {
+    case DriverType_BLDC:
+        return CurrentSense_alignBLDCDriver(cs, voltage, cs->driver, modulation_centered);
+    case DriverType_Stepper:
+        return CurrentSense_alignStepperDriver(cs, voltage, cs->driver, modulation_centered);
+    case DriverType_Hybrid:
+        return CurrentSense_alignHybridDriver(cs, voltage, cs->driver, modulation_centered);
+    default:
+        // driver type not supported
+        TinyFOC_DEBUG("CS: Cannot align driver type!");
+        return 0;
+    }
+}
+
+void CurrentSense_load_default(CurrentSense *cs)
+{
+    cs->init = default_init;
+    cs->driverAlign = default_driverAlign;
+    cs->getPhaseCurrents = default_getPhaseCurrents;
+    cs->getDCCurrent = default_getDCCurrent;
+    cs->enable = default_enable;
+    cs->disable = default_disable;
 }

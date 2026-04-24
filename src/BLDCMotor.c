@@ -131,7 +131,7 @@ void BLDCMotor_setPhaseVoltage(FOCMotor *motor, float Uq, float Ud, float angle_
     case FOCModulationType_Trapezoid_120 :
       // see https://www.youtube.com/watch?v=InzXA7mWBWE Slide 5
       // determine the sector
-      sector = 6 * (_normalizeAngle(angle_el + _PI_6 ) / _2PI); // adding PI/6 to align with other modes
+      sector = 6 * (int)(_normalizeAngle(angle_el + _PI_6 ) / _2PI); // adding PI/6 to align with other modes
       // centering the voltages around either
       // modulation_centered == true > driver.voltage_limit/2
       // modulation_centered == false > or Adaptable centering, all phases drawn to 0 when Uq=0
@@ -159,7 +159,7 @@ void BLDCMotor_setPhaseVoltage(FOCMotor *motor, float Uq, float Ud, float angle_
     case FOCModulationType_Trapezoid_150 :
       // see https://www.youtube.com/watch?v=InzXA7mWBWE Slide 8
       // determine the sector
-      sector = 12 * (_normalizeAngle(angle_el + _PI_6 ) / _2PI); // adding PI/6 to align with other modes
+      sector = 12 * (int)(_normalizeAngle(angle_el + _PI_6 ) / _2PI); // adding PI/6 to align with other modes
       // centering the voltages around either
       // modulation_centered == true > driver.voltage_limit/2
       // modulation_centered == false > or Adaptable centering, all phases drawn to 0 when Uq=0
@@ -239,6 +239,7 @@ void BLDCMotor_setPhaseVoltage(FOCMotor *motor, float Uq, float Ud, float angle_
   motor->driver->setPwm(motor->driver, motor->Ua, motor->Ub, motor->Uc);
 }
 
+
 void BLDCMotor_load_default(FOCMotor *motor)
 {
   FOCMotor_load_default(motor);
@@ -260,4 +261,6 @@ void BLDCMotor_load_default(FOCMotor *motor)
   motor->estimateBEMF = BLDCMotor_estimateBEMF;
   motor->setPhaseVoltage = BLDCMotor_setPhaseVoltage;
   motor->init = BLDCMotor_init;
+  motor->enable = BLDCMotor_enable;
+  motor->disable = BLDCMotor_disable;
 }

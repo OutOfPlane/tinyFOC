@@ -5,7 +5,7 @@
 
 
 // enable motor driver
-void default_enable(FOCDriver *driver)
+static void default_enable(FOCDriver *driver)
 {
     // enable_pin the driver - if enable_pin pin available
     if (driver->ll->enable) driver->ll->enable(driver->ll);
@@ -16,7 +16,7 @@ void default_enable(FOCDriver *driver)
 }
 
 // disable motor driver
-void default_disable(FOCDriver *driver)
+static void default_disable(FOCDriver *driver)
 {
     // set phase state to disabled
     driver->setPhaseState(driver, PHASE_OFF, PHASE_OFF, PHASE_OFF);
@@ -27,7 +27,7 @@ void default_disable(FOCDriver *driver)
 }
 
 // init hardware pins
-int default_init(FOCDriver *driver)
+static int default_init(FOCDriver *driver)
 {
     // ll hw
     if(driver->ll->init) driver->ll->init(driver->ll);
@@ -45,7 +45,7 @@ int default_init(FOCDriver *driver)
 }
 
 // Set voltage to the pwm pin
-void default_setPwm(FOCDriver *driver, float Ua, float Ub, float Uc)
+static void default_setPwm(FOCDriver *driver, float Ua, float Ub, float Uc)
 {
     FOCDriver_ll *param = driver->ll;
     // limit the voltage in driver
@@ -65,9 +65,14 @@ void default_setPwm(FOCDriver *driver, float Ua, float Ub, float Uc)
 // Set the phase state
 // actually changing the state is only done on the next call to setPwm, and depends
 // on the hardware capabilities of the driver and MCU.
-void default_setPhaseState(FOCDriver *driver, enum PhaseState sa, enum PhaseState sb, enum PhaseState sc)
+static void default_setPhaseState(FOCDriver *driver, enum PhaseState sa, enum PhaseState sb, enum PhaseState sc)
 {
     //TODO: add ll implementation
+}
+
+static enum DriverType default_drivertype(FOCDriver *driver)
+{
+    return DriverType_BLDC;
 }
 
 void FOCDriver_load_default(FOCDriver *driver)
@@ -75,6 +80,9 @@ void FOCDriver_load_default(FOCDriver *driver)
     driver->init = default_init;
     driver->setPwm = default_setPwm;
     driver->setPhaseState = default_setPhaseState;
+    driver->enable = default_enable;
+    driver->disable = default_disable;
+    driver->type = default_drivertype;
     
     //low level driver
     driver->ll = NULL;

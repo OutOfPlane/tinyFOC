@@ -12,11 +12,13 @@
  */
 void _delay(unsigned long ms);
 
+void _delay_us(unsigned long us);
+
 /** 
  * Function implementing timestamp getting function in microseconds
  * hardware specific
  */
-unsigned long _micros();
+unsigned long (*_micros)(void);
 
 
 #endif

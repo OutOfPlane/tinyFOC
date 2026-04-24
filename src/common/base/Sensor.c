@@ -4,8 +4,8 @@
 
 
 
-void default_update(Sensor *sns) {
-    float val = getSensorAngle();
+static void default_update(Sensor *sns) {
+    float val = sns->getSensorAngle(sns);
     if (val<0) // sensor angles are strictly non-negative. Negative values are used to signal errors.
         return; // TODO signal error, e.g. via a flag and counter
     sns->angle_prev_ts = _micros();
@@ -17,7 +17,7 @@ void default_update(Sensor *sns) {
 
 
  /** get current angular velocity (rad/s) */
-float default_getVelocity(Sensor *sns) {
+static float default_getVelocity(Sensor *sns) {
     // calculate sample time
     // if timestamps were unsigned, we could get rid of this section, unsigned overflow handles it correctly
     float Ts = (sns->angle_prev_ts - sns->vel_angle_prev_ts)*1e-6f;
@@ -56,45 +56,45 @@ float default_getVelocity(Sensor *sns) {
 
 
 
-void default_init(Sensor *sns) {
+static void default_init(Sensor *sns) {
     // initialize all the internal variables of Sensor to ensure a "smooth" startup (without a 'jump' from zero)
     sns->getSensorAngle(sns); // call once
-    delayMicroseconds(1);
+    _delay_us(1);
     sns->vel_angle_prev = sns->getSensorAngle(sns); // call again
     sns->vel_angle_prev_ts = _micros();
-    delay(1);
+    _delay(1);
     sns->getSensorAngle(sns); // call once
-    delayMicroseconds(1);
+    _delay_us(1);
     sns->angle_prev = sns->getSensorAngle(sns); // call again
     sns->angle_prev_ts = _micros();
 }
 
 
-float default_getMechanicalAngle(Sensor *sns) {
+static float default_getMechanicalAngle(Sensor *sns) {
     return sns->angle_prev;
 }
 
 
 
-float default_getAngle(Sensor *sns){
+static float default_getAngle(Sensor *sns){
     return (float)sns->full_rotations * _2PI + sns->angle_prev;
 }
 
 
 
-double default_getPreciseAngle(Sensor *sns) {
+static double default_getPreciseAngle(Sensor *sns) {
     return (double)sns->full_rotations * (double)_2PI + (double)sns->angle_prev;
 }
 
 
 
-int32_t default_getFullRotations(Sensor *sns) {
+static int32_t default_getFullRotations(Sensor *sns) {
     return sns->full_rotations;
 }
 
 
 
-int default_needsSearch(Sensor *sns) {
+static int default_needsSearch(Sensor *sns) {
     return 0; // default false
 }
 

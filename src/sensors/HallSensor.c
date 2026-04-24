@@ -1,5 +1,8 @@
 #include "HallSensor.h"
 
+// seq 1 > 5 > 4 > 6 > 2 > 3 > 1     000 001 010 011 100 101 110 111
+const int8_t ELECTRIC_SECTORS[8] = {-1, 0, 4, 5, 2, 1, 3, -1};
+
 /**
  * Updates the state and sector following an interrupt
  */
@@ -41,7 +44,8 @@ void HallSensor_updateState(HallSensor *hs) {
 
 
 // Sensor update function. Safely copy volatile interrupt variables into Sensor base class state variables.
-void HallSensor_update(HallSensor *hs) {
+void HallSensor_update(Sensor *sns){
+  HallSensor *hs = (HallSensor *)sns->parent;
   HallSensor_updateState(hs);
 
   hs->sensor.angle_prev_ts = hs->pulse_timestamp;
@@ -49,6 +53,12 @@ void HallSensor_update(HallSensor *hs) {
   int8_t last_electric_sector = hs->electric_sector;
   hs->sensor.angle_prev = ((float)((last_electric_rotations * 6 + last_electric_sector) % hs->cpr) / (float)hs->cpr) * _2PI ;
   hs->sensor.full_rotations = (int32_t)((last_electric_rotations * 6 + last_electric_sector) / hs->cpr);
+
+  if (hs->pulse_diff == 0 || ((long)(_micros() - hs->pulse_timestamp) > hs->pulse_diff*2) ) { // last velocity isn't accurate if too old
+    hs->angle_cache = hs->sensor.angle_prev; // keep previous value if velocity isn't accurate
+  } else {
+    hs->angle_cache = hs->sensor.angle_prev + (hs->direction * (_2PI / (float)hs->cpr) / (hs->pulse_diff / 1000000.0f)) * ((float)(_micros() - hs->pulse_timestamp) / 1000000.0f);
+  }
 }
 
 
@@ -57,15 +67,16 @@ void HallSensor_update(HallSensor *hs) {
 	Shaft angle calculation
   TODO: numerical precision issue here if the electrical rotation overflows the angle will be lost
 */
-float HallSensor_getSensorAngle(HallSensor *hs) {
-  return ((float)(hs->electric_rotations * 6 + hs->electric_sector) / (float)hs->cpr) * _2PI ;
+float HallSensor_getSensorAngle(Sensor *sns){
+  return sns->angle_prev;
 }
 
 /*
   Shaft velocity calculation
   function using mixed time and frequency measurement technique
 */
-float HallSensor_getVelocity(HallSensor *hs){
+float HallSensor_getVelocity(Sensor *sns){
+  HallSensor *hs = (HallSensor *)sns->parent;
   long last_pulse_timestamp = hs->pulse_timestamp;
   long last_pulse_diff = hs->pulse_diff;
 
@@ -79,14 +90,15 @@ float HallSensor_getVelocity(HallSensor *hs){
 
 // HallSensor initialisation of the hardware pins 
 // and calculation variables
-void HallSensor_init(HallSensor *hs){
+void HallSensor_init(Sensor *sns){
+  HallSensor *hs = (HallSensor *)sns->parent;
   // hall has 6 segments per electrical revolution
   hs->cpr = hs->pp * 6;
 
   // initialise the electrical rotations to 0
   hs->electric_rotations = 0;
 
-  updateState();
+  HallSensor_updateState(hs);
 
   hs->pulse_timestamp = _micros();
 }
@@ -98,5 +110,14 @@ void HallSensor_load_default(HallSensor *hs)
   hs->sensor.getVelocity = HallSensor_getVelocity;
   hs->sensor.getSensorAngle = HallSensor_getSensorAngle;
   hs->sensor.update = HallSensor_update;
-
+  hs->ll = NULL;
+  hs->hall_state = 0;
+  hs->direction = Direction_UNKNOWN;
+  hs->old_direction = Direction_UNKNOWN;
+  hs->electric_sector = 0;
+  hs->sensor.parent = hs;
+  hs->pulse_timestamp = 0;
+  hs->total_interrupts = 0;
+  hs->velocity_max = 1000; // default max velocity of 1000 rad
+  hs->angle_cache = 0;
 }

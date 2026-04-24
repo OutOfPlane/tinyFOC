@@ -1,0 +1,23 @@
+# Create a library named 'my_math'
+add_library(tinyfoc
+    common/base/CurrentSense.c
+    common/base/FOCDriver.c
+    common/base/FOCMotor.c
+    common/base/Sensor.c
+    common/foc_utils.c
+    common/lowpass_filter.c
+    common/pid.c
+    common/time_utils.c
+    communication/TinyFOCDebug.c
+    sensors/HallSensor.c
+    BLDCMotor.c
+    )
+
+# Tell CMake where the header files are for this library
+target_include_directories(tinyfoc PUBLIC 
+    common/base
+    common
+    communication
+    sensors
+    .
+    )

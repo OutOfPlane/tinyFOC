@@ -1,5 +1,6 @@
 #include "foc_utils.h"
 #include "stdint.h"
+#include "math.h"
 
 // function approximating the sine calculation by using fixed size array
 // uses a 65 element lookup table and interpolation
@@ -26,6 +27,16 @@ float _sin(float a){
     t1 = -(int32_t)sine_array[256 - i]; t2 = -(int32_t)sine_array[255 - i];
   }
   return (1.0f/32768.0f) * (t1 + (((t2 - t1) * frac) >> 8));
+}
+
+float _abs(float a)
+{
+    return a>0 ? a : -a;
+}
+
+float _log(float a)
+{
+    return log(a);
 }
 
 // function approximating cosine calculation by using fixed size array

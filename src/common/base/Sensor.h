@@ -131,6 +131,7 @@ typedef struct s_Sensor{
         long vel_angle_prev_ts; // last velocity calculation timestamp
         int32_t full_rotations; // full rotation tracking
         int32_t vel_full_rotations; // previous full rotation value for velocity calculation
+        void *parent; // pointer to parent struct, e.g. HallSensor, MagneticSensor, Encoder, etc. Can be used to access specific fields of the subclass from the base class methods.
 }Sensor;
 
 void Sensor_load_default(Sensor *sns);

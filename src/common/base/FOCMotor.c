@@ -2,37 +2,37 @@
 
 // time measuring function
 // It filters the value using low pass filtering alpha = 0.1
-void updateTime(uint32_t *elapsed_time_filetered, uint32_t *elapsed_time, uint32_t *last_timestamp_us, float alpha)
+static void updateTime(uint32_t *elapsed_time_filetered, uint32_t *elapsed_time, uint32_t *last_timestamp_us, float alpha)
 {
     uint32_t now = _micros();
-    elapsed_time = now - *last_timestamp_us;
-    *elapsed_time_filetered = (1 - alpha) * *elapsed_time_filetered + alpha * *elapsed_time;
-    last_timestamp_us = now;
+    *elapsed_time = now - *last_timestamp_us;
+    *elapsed_time_filetered = (uint32_t)((1 - alpha) * *elapsed_time_filetered + alpha * *elapsed_time);
+    *last_timestamp_us = now;
 }
 
-void linkCustomMotionControl(FOCMotor *motor, float (*controlMethod)(FOCMotor *motor))
+static void linkCustomMotionControl(FOCMotor *motor, float (*controlMethod)(FOCMotor *motor))
 {
     motor->customMotionControlCallback = controlMethod;
 }
 
-void updateLoopFOCTime(FOCMotor *motor)
+static void updateLoopFOCTime(FOCMotor *motor)
 {
     updateTime(&(motor->loopfoc_time_us), &(motor->last_loopfoc_time_us), &(motor->last_loopfoc_timestamp_us), 0.1f);
 }
 
-void updateMotionControlTime(FOCMotor *motor)
+static void updateMotionControlTime(FOCMotor *motor)
 {
     updateTime(&(motor->move_time_us), &(motor->last_move_time_us), &(motor->last_move_timestamp_us), 0.1f);
 }
 
-void default_init(FOCMotor *motor)
+static void default_init(FOCMotor *motor)
 {
 }
 
 /**
     Sensor linking method
 */
-void default_linkSensor(FOCMotor *motor, Sensor *_sensor)
+static void default_linkSensor(FOCMotor *motor, Sensor *_sensor)
 {
     motor->sensor = _sensor;
 }
@@ -40,7 +40,7 @@ void default_linkSensor(FOCMotor *motor, Sensor *_sensor)
 /**
     Driver linking method
 */
-void default_linkDriver(FOCMotor *motor, FOCDriver *_driver)
+static void default_linkDriver(FOCMotor *motor, FOCDriver *_driver)
 {
     motor->driver = _driver;
 }
@@ -48,13 +48,13 @@ void default_linkDriver(FOCMotor *motor, FOCDriver *_driver)
 /**
  CurrentSense linking method
  */
-void default_linkCurrentSense(FOCMotor *motor, CurrentSense *_current_sense)
+static void default_linkCurrentSense(FOCMotor *motor, CurrentSense *_current_sense)
 {
     motor->current_sense = _current_sense;
 }
 
 // shaft angle calculation
-float default_shaftAngle(FOCMotor *motor)
+static float default_shaftAngle(FOCMotor *motor)
 {
     // if no sensor linked return previous value ( for open loop )
     if (!motor->sensor)
@@ -63,15 +63,15 @@ float default_shaftAngle(FOCMotor *motor)
 }
 
 // shaft velocity calculation
-float default_shaftVelocity(FOCMotor *motor)
+static float default_shaftVelocity(FOCMotor *motor)
 {
     // if no sensor linked return previous value ( for open loop )
     if (!motor->sensor)
         return motor->shaft_velocity;
-    return motor->sensor_direction * LPF_velocity(motor->sensor->getVelocity(motor->sensor));
+    return motor->sensor_direction * LowPassFilter_update(&motor->LPF_velocity, motor->sensor->getVelocity(motor->sensor));
 }
 
-float default_electricalAngle(FOCMotor *motor)
+static float default_electricalAngle(FOCMotor *motor)
 {
     // if no sensor linked return previous value ( for open loop )
     if (!motor->sensor)
@@ -83,9 +83,9 @@ float default_electricalAngle(FOCMotor *motor)
  *  Monitoring functions
  */
 // function implementing the monitor_port setter
-void default_useMonitoring(FOCMotor *motor, Print *print)
+static void default_useMonitoring(FOCMotor *motor, Print *print)
 {
-    motor->monitor_port = &print; // operate on the address of print
+    motor->monitor_port = print; // operate on the address of print
     //   #ifndef TinyFOC_DISABLE_DEBUG
     //   TinyFOCDebug::enable(&print);
     //   TinyFOC_MOTOR_DEBUG("Monitor enabled!");
@@ -93,7 +93,7 @@ void default_useMonitoring(FOCMotor *motor, Print *print)
 }
 
 // Measure resistance and inductance of a motor
-int default_characteriseMotor(FOCMotor *motor, float voltage, float correction_factor)
+static int default_characteriseMotor(FOCMotor *motor, float voltage, float correction_factor)
 {
     if (!motor->current_sense || !motor->current_sense->initialized)
     {
@@ -124,17 +124,17 @@ int default_characteriseMotor(FOCMotor *motor, float voltage, float correction_f
     current_electric_angle = motor->electricalAngle(motor);
     for (int i = 0; i < 100; i++)
     {
-        motor->setPhaseVoltage(motor, 0, voltage / 100.0 * ((float)i), current_electric_angle);
+        motor->setPhaseVoltage(motor, 0, voltage / 100 * ((float)i), current_electric_angle);
         _delay(3);
     }
     _delay(10);
-    PhaseCurrent_s r_currents_raw = CurrentSense_readAverageCurrents(motor->current_sense, CURRENT_SENSE_N);
+    // PhaseCurrent_s r_currents_raw = CurrentSense_readAverageCurrents(motor->current_sense, CURRENT_SENSE_N);
     DQCurrent_s r_currents = CurrentSense_getDQCurrents(motor->current_sense, CurrentSense_getABCurrents(motor->current_sense, zerocurrent_raw), current_electric_angle);
 
     // Zero again
     motor->setPhaseVoltage(motor, 0, 0, current_electric_angle);
 
-    if (fabsf(r_currents.d - zerocurrent.d) < 0.2f)
+    if (_abs(r_currents.d - zerocurrent.d) < 0.2f)
     {
         TinyFOC_MOTOR_ERROR("Fail. current too low");
         return 3;
@@ -187,14 +187,14 @@ int default_characteriseMotor(FOCMotor *motor, float voltage, float correction_f
                 // step the voltage
                 motor->setPhaseVoltage(motor, 0, voltage, current_electric_angle);
                 t0 = _micros();
-                delayMicroseconds(risetime_us); // wait a little bit
+                _delay_us(risetime_us); // wait a little bit
 
                 PhaseCurrent_s l_currents_raw = motor->current_sense->getPhaseCurrents(motor->current_sense);
                 t1 = _micros();
                 motor->setPhaseVoltage(motor, 0, 0, current_electric_angle);
 
                 DQCurrent_s l_currents = CurrentSense_getDQCurrents(motor->current_sense, CurrentSense_getABCurrents(motor->current_sense, l_currents_raw), current_electric_angle);
-                delayMicroseconds(settle_us); // wait a bit for the currents to go to 0 again
+                _delay_us(settle_us); // wait a bit for the currents to go to 0 again
 
                 if (t0 > t1)
                     continue; // safety first
@@ -206,7 +206,7 @@ int default_characteriseMotor(FOCMotor *motor, float voltage, float correction_f
                     continue;
                 }
 
-                inductanced += fabsf(-(resistance * dt) / log((voltage - resistance * (l_currents.d - zerocurrent.d)) / voltage)) / correction_factor;
+                inductanced += _abs(-(resistance * dt) / _log((voltage - resistance * (l_currents.d - zerocurrent.d)) / voltage)) / correction_factor;
 
                 qcurrent += l_currents.q - zerocurrent.q; // average the measured currents
                 dcurrent += l_currents.d - zerocurrent.d;
@@ -214,12 +214,12 @@ int default_characteriseMotor(FOCMotor *motor, float voltage, float correction_f
             qcurrent /= cycles;
             dcurrent /= cycles;
 
-            float delta = qcurrent / (fabsf(dcurrent) + fabsf(qcurrent));
+            float delta = qcurrent / (_abs(dcurrent) + _abs(qcurrent));
 
             inductanced /= cycles;
             Ltemp = i < 2 ? inductanced : Ltemp * 0.6 + inductanced * 0.4;
 
-            float timeconstant = fabsf(Ltemp / resistance); // Timeconstant of an RL circuit (L/R)
+            float timeconstant = _abs(Ltemp / resistance); // Timeconstant of an RL circuit (L/R)
             // TinyFOC_MOTOR_DEBUG("Estimated time constant in us: ", 1000000.0f * timeconstant);
 
             // Wait as long as possible (due to limited timing accuracy & sample rate), but as short as needed (while the current still changes)
@@ -241,11 +241,11 @@ int default_characteriseMotor(FOCMotor *motor, float voltage, float correction_f
 
             if (qcurrent < 0)
             {
-                current_electric_angle += fabsf(delta);
+                current_electric_angle += _abs(delta);
             }
             else
             {
-                current_electric_angle -= fabsf(delta);
+                current_electric_angle -= _abs(delta);
             }
             current_electric_angle = _normalizeAngle(current_electric_angle);
 
@@ -281,7 +281,7 @@ int default_characteriseMotor(FOCMotor *motor, float voltage, float correction_f
         float estimated_zero_electric_angle_A = _normalizeAngle((float)(motor->sensor_direction * motor->pole_pairs) * motor->sensor->getMechanicalAngle(motor->sensor) - d_electrical_angle);
         float estimated_zero_electric_angle_B = _normalizeAngle((float)(motor->sensor_direction * motor->pole_pairs) * motor->sensor->getMechanicalAngle(motor->sensor) - d_electrical_angle + _PI);
         float estimated_zero_electric_angle = 0.0f;
-        if (fabsf(estimated_zero_electric_angle_A - motor->zero_electric_angle) < fabsf(estimated_zero_electric_angle_B - motor->zero_electric_angle))
+        if (_abs(estimated_zero_electric_angle_A - motor->zero_electric_angle) < _abs(estimated_zero_electric_angle_B - motor->zero_electric_angle))
         {
             estimated_zero_electric_angle = estimated_zero_electric_angle_A;
         }
@@ -315,7 +315,7 @@ int default_characteriseMotor(FOCMotor *motor, float voltage, float correction_f
 
 // utility function intended to be used with serial plotter to monitor motor variables
 // significantly slowing the execution down!!!!
-void default_monitor(FOCMotor *motor)
+static void default_monitor(FOCMotor *motor)
 {
     if (!motor->monitor_downsample || motor->monitor_cnt++ < (motor->monitor_downsample - 1))
         return;
@@ -355,7 +355,7 @@ void default_monitor(FOCMotor *motor)
         DQCurrent_s c = motor->current;
         if (motor->current_sense && motor->torque_controller != TorqueControlType_foc_current)
         {
-            
+
             c = CurrentSense_getFOCCurrents(motor->current_sense, motor->electrical_angle);
             c.q = LowPassFilter_update(&(motor->LPF_current_q), c.q);
             c.d = LowPassFilter_update(&(motor->LPF_current_d), c.d);
@@ -410,75 +410,6 @@ void default_monitor(FOCMotor *motor)
     }
 }
 
-void FOCMotor_load_default(FOCMotor *motor)
-{
-    // maximum angular velocity to be used for positioning
-    motor->velocity_limit = DEF_VEL_LIM;
-    // maximum voltage to be set to the motor
-    motor->voltage_limit = DEF_POWER_SUPPLY;
-    // not set on the begining
-    motor->current_limit = DEF_CURRENT_LIM;
-
-    // index search velocity
-    motor->velocity_index_search = DEF_INDEX_SEARCH_TARGET_VELOCITY;
-    // sensor and motor align voltage
-    motor->voltage_sensor_align = DEF_VOLTAGE_SENSOR_ALIGN;
-
-    // default modulation is SinePWM
-    motor->foc_modulation = FOCModulationType_SinePWM;
-
-    // default target value
-    motor->target = 0;
-    motor->voltage.d = 0;
-    motor->voltage.q = 0;
-    // current target values
-    motor->current_sp = 0;
-    motor->current.q = 0;
-    motor->current.d = 0;
-
-    // voltage bemf
-    motor->voltage_bemf = 0;
-    motor->feed_forward_velocity = 0.0f;
-
-    // Initialize phase voltages U alpha and U beta used for inverse Park and Clarke transform
-    motor->Ualpha = 0;
-    motor->Ubeta = 0;
-
-    // monitor_port
-    motor->monitor_port = NULL;
-    motor->monitor_downsample = DEF_MON_DOWNSMAPLE;
-    motor->monitor_start_char = '\0';
-    motor->monitor_end_char = '\0';
-    motor->monitor_separator = '\t';
-    motor->monitor_decimals = 4;
-    motor->monitor_variables = _MON_TARGET | _MON_VOLT_Q | _MON_VEL | _MON_ANGLE;
-    motor->monitor_cnt = 0;
-
-    motor->loopfoc_time_us = 0;
-    motor->move_time_us = 0;
-    motor->last_loopfoc_timestamp_us = 0;
-    motor->last_loopfoc_time_us = 0;
-    motor->last_move_timestamp_us = 0;
-    motor->last_move_time_us = 0;
-
-    // sensor
-    motor->sensor_offset = 0.0f;
-    motor->sensor = NULL;
-    // current sensor
-    motor->current_sense = NULL;
-
-    // default implementation
-    motor->init = default_init;
-    motor->linkSensor = default_linkSensor;
-    motor->linkCurrentSense = default_linkCurrentSense;
-    motor->shaftAngle = default_shaftAngle;
-    motor->shaftVelocity = default_shaftVelocity;
-    motor->electricalAngle = default_electricalAngle;
-    motor->useMonitoring = default_useMonitoring;
-    motor->characteriseMotor = default_characteriseMotor;
-    motor->monitor = default_monitor;
-}
-
 // Function (iterative) generating open loop movement for target velocity
 // - target_velocity - rad/s
 // it uses voltage_limit variable
@@ -524,9 +455,9 @@ float FOCMotor_angleOpenloop(FOCMotor *motor, float target_angle)
     // TODO sensor precision: this calculation is not numerically precise. The angle can grow to the point
     //                        where small position changes are no longer captured by the precision of floats
     //                        when the total position is large.
-    if (abs(target_angle - motor->shaft_angle) > abs(motor->velocity_limit * Ts))
+    if (_abs(target_angle - motor->shaft_angle) > _abs(motor->velocity_limit * Ts))
     {
-        motor->shaft_angle += _sign(target_angle - motor->shaft_angle) * abs(motor->velocity_limit) * Ts;
+        motor->shaft_angle += _sign(target_angle - motor->shaft_angle) * _abs(motor->velocity_limit) * Ts;
         motor->shaft_velocity = motor->velocity_limit;
     }
     else
@@ -550,7 +481,7 @@ void FOCMotor_updateVelocityLimit(FOCMotor *motor, float new_velocity_limit)
 {
     motor->velocity_limit = new_velocity_limit;
     if (motor->controller != MotionControlType_angle_nocascade)
-        motor->P_angle.limit = abs(motor->velocity_limit); // if angle control but no velocity cascade, limit the angle controller by the velocity limit
+        motor->P_angle.limit = _abs(motor->velocity_limit); // if angle control but no velocity cascade, limit the angle controller by the velocity limit
 }
 
 // Update limit values in controllers when changed
@@ -661,7 +592,7 @@ int FOCMotor_tuneCurrentController(FOCMotor *motor, float bandwidth)
     if (motor->loopfoc_time_us && bandwidth > 0.5f * (1e6f / motor->loopfoc_time_us))
     {
         // check bandwidth is not too high for the control loop frequency
-        TinyFOC_MOTOR_ERROR("Fail. BW too high, current loop freq:", (1e6f / loopfoc_time_us));
+        TinyFOC_MOTOR_ERROR("Fail. BW too high, current loop freq:", (1e6f / motor->loopfoc_time_us));
         return 2;
     }
     if (!_isset(motor->phase_resistance) || (!_isset(motor->phase_inductance) && !_isset(motor->axis_inductance.q)))
@@ -698,8 +629,11 @@ int FOCMotor_tuneCurrentController(FOCMotor *motor, float bandwidth)
 
 // Iterative function looping FOC algorithm, setting Uq on the Motor
 // The faster it can be run the better
-void FOCMotor_loopFOC(FOCMotor *motor)
+static void default_loopFOC(FOCMotor *motor)
 {
+    if (motor->motion_cnt++ > motor->motion_downsample)
+        motor->move(motor, NOT_SET);
+    
     // update loop time measurement
     updateLoopFOCTime(motor);
 
@@ -806,17 +740,14 @@ void FOCMotor_loopFOC(FOCMotor *motor)
 // It runs either angle, velocity or voltage loop
 // - needs to be called iteratively it is asynchronous function
 // - if target is not set it uses motor.target value
-void FOCMotor_move(FOCMotor *motor, float new_target)
+static void default_move(FOCMotor *motor, float new_target)
 {
+    motor->motion_cnt = 1;
 
     // set internal target variable
     if (_isset(new_target))
         motor->target = new_target;
 
-    // downsampling (optional)
-    if (motor->motion_cnt++ < motor->motion_downsample)
-        return;
-    motor->motion_cnt = 0;
 
     // if initFOC is being executed at the moment, do nothing
     if (motor->motor_status == FOCMotorStatus_calibrating)
@@ -840,8 +771,8 @@ void FOCMotor_move(FOCMotor *motor, float new_target)
     {
         // read the values only if the motor is not in open loop
         // because in open loop the shaft angle/velocity is updated within angle/velocityOpenLoop functions
-        motor->shaft_angle = shaftAngle();
-        motor->shaft_velocity = shaftVelocity();
+        motor->shaft_angle = motor->shaftAngle(motor);
+        motor->shaft_velocity = motor->shaftVelocity(motor);
     }
 
     // if disabled do nothing
@@ -862,7 +793,7 @@ void FOCMotor_move(FOCMotor *motor, float new_target)
         // angle set point
         motor->shaft_angle_sp = motor->target;
         // calculate the torque command - sensor precision: this calculation is ok, but based on bad value from previous calculation
-        motor->current_sp = PIDController_update(&(motor->P_angle), motor->shaft_angle_sp - LPF_angle(motor->shaft_angle));
+        motor->current_sp = PIDController_update(&(motor->P_angle), motor->shaft_angle_sp - LowPassFilter_update(&motor->LPF_angle, motor->shaft_angle));
         break;
     case MotionControlType_angle:
         // TODO sensor precision: this calculation is not numerically precise. The target value cannot express precise positions when
@@ -871,7 +802,7 @@ void FOCMotor_move(FOCMotor *motor, float new_target)
         // angle set point
         motor->shaft_angle_sp = motor->target;
         // calculate velocity set point
-        motor->shaft_velocity_sp = motor->feed_forward_velocity + PIDController_update(&(motor->P_angle), motor->shaft_angle_sp - LPF_angle(motor->shaft_angle));
+        motor->shaft_velocity_sp = motor->feed_forward_velocity + PIDController_update(&(motor->P_angle), motor->shaft_angle_sp - LowPassFilter_update(&motor->LPF_angle, motor->shaft_angle));
         motor->shaft_velocity_sp = _constrain(motor->shaft_velocity_sp, -motor->velocity_limit, motor->velocity_limit);
         // calculate the torque command - sensor precision: this calculation is ok, but based on bad value from previous calculation
         motor->current_sp = PIDController_update(&(motor->PID_velocity), motor->shaft_velocity_sp - motor->shaft_velocity);
@@ -912,7 +843,7 @@ void FOCMotor_move(FOCMotor *motor, float new_target)
 }
 
 // FOC initialization function
-int FOCMotor_initFOC(FOCMotor *motor)
+static int default_initFOC(FOCMotor *motor)
 {
     int exit_flag = 1;
 
@@ -976,7 +907,7 @@ int FOCMotor_initFOC(FOCMotor *motor)
     {
         TinyFOC_MOTOR_ERROR("Init FOC fail");
         motor->motor_status = FOCMotorStatus_calib_failed;
-        disable();
+        motor->disable(motor);
     }
 
     return exit_flag;
@@ -1052,7 +983,7 @@ int FOCMotor_alignSensor(FOCMotor *motor)
         // setPhaseVoltage(0, 0, 0);
         _delay(200);
         // determine the direction the sensor moved
-        float moved = fabs(mid_angle - end_angle);
+        float moved = _abs(mid_angle - end_angle);
         if (moved < MIN_ANGLE_DETECT_MOVEMENT)
         { // minimum angle to detect movement
             TinyFOC_MOTOR_ERROR("Failed to notice movement");
@@ -1145,4 +1076,82 @@ int FOCMotor_absoluteZeroSearch(FOCMotor *motor)
         }
     }
     return !motor->sensor->needsSearch(motor->sensor);
+}
+
+void FOCMotor_load_default(FOCMotor *motor)
+{
+    // maximum angular velocity to be used for positioning
+    motor->velocity_limit = DEF_VEL_LIM;
+    // maximum voltage to be set to the motor
+    motor->voltage_limit = DEF_POWER_SUPPLY;
+    // not set on the begining
+    motor->current_limit = DEF_CURRENT_LIM;
+
+    // index search velocity
+    motor->velocity_index_search = DEF_INDEX_SEARCH_TARGET_VELOCITY;
+    // sensor and motor align voltage
+    motor->voltage_sensor_align = DEF_VOLTAGE_SENSOR_ALIGN;
+
+    // default modulation is SinePWM
+    motor->foc_modulation = FOCModulationType_SinePWM;
+
+    // default target value
+    motor->target = 0;
+    motor->voltage.d = 0;
+    motor->voltage.q = 0;
+    // current target values
+    motor->current_sp = 0;
+    motor->current.q = 0;
+    motor->current.d = 0;
+
+    // voltage bemf
+    motor->voltage_bemf = 0;
+    motor->feed_forward_velocity = 0.0f;
+
+    // Initialize phase voltages U alpha and U beta used for inverse Park and Clarke transform
+    motor->Ualpha = 0;
+    motor->Ubeta = 0;
+
+    // monitor_port
+    motor->monitor_port = NULL;
+    motor->monitor_downsample = DEF_MON_DOWNSMAPLE;
+    motor->monitor_start_char = '\0';
+    motor->monitor_end_char = '\0';
+    motor->monitor_separator = '\t';
+    motor->monitor_decimals = 4;
+    motor->monitor_variables = _MON_TARGET | _MON_VOLT_Q | _MON_VEL | _MON_ANGLE;
+    motor->monitor_cnt = 0;
+
+    motor->motion_downsample = 10;
+    motor->motion_cnt = 1;
+
+    motor->loopfoc_time_us = 0;
+    motor->move_time_us = 0;
+    motor->last_loopfoc_timestamp_us = 0;
+    motor->last_loopfoc_time_us = 0;
+    motor->last_move_timestamp_us = 0;
+    motor->last_move_time_us = 0;
+
+    motor->enabled = 1;
+
+    // sensor
+    motor->sensor_offset = 0.0f;
+    motor->sensor = NULL;
+    // current sensor
+    motor->current_sense = NULL;
+
+    // default implementation
+    motor->init = default_init;
+    motor->linkSensor = default_linkSensor;
+    motor->linkCurrentSense = default_linkCurrentSense;
+    motor->linkDriver = default_linkDriver;
+    motor->shaftAngle = default_shaftAngle;
+    motor->shaftVelocity = default_shaftVelocity;
+    motor->electricalAngle = default_electricalAngle;
+    motor->useMonitoring = default_useMonitoring;
+    motor->characteriseMotor = default_characteriseMotor;
+    motor->monitor = default_monitor;
+    motor->loopFOC = default_loopFOC;
+    motor->initFOC = default_initFOC;
+    motor->move = default_move;
 }
