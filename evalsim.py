@@ -10,6 +10,7 @@ import matplotlib.pyplot as plt
 bldc_dtype = np.dtype([
     ('angle', 'f4'),
     ('velocity', 'f4'),
+    ('torque', 'f4'),
     ('current_a', 'f4'),
     ('current_b', 'f4'),
     ('current_c', 'f4'),
@@ -34,19 +35,27 @@ sns_data = np.fromfile("sensor_data.bin", dtype=sens_dtype)
 t = data['last_update'] / 1e6  # Convert microseconds to seconds
 angle_deg = np.unwrap(data['angle']) * 180 / np.pi  # Convert radians to degrees
 sns_angle = np.unwrap(sns_data['val0']) * 180 / np.pi  # Convert radians to degrees
+R_VAL = 0.3  # Ohms, should match the value used in the simulation
+copper_loss = (data['current_a']**2 + data['current_b']**2 + data['current_c']**2) * R_VAL
 # 3. Plot the data
 plt.figure(figsize=(10, 6))
 plt.plot(t, angle_deg, label='Motor Angle (deg)')
 plt.plot(t, sns_angle, label='Sensor Angle (deg)')
-plt.plot(t, data['voltage_a'], label='Phase A Voltage (V)')
-plt.plot(t, data['voltage_b'], label='Phase B Voltage (V)')
-plt.plot(t, data['voltage_c'], label='Phase C Voltage (V)')
+plt.plot(t, data['current_a'], label='Phase A Current (A)')
+plt.plot(t, data['current_b'], label='Phase B Current (A)')
+plt.plot(t, data['current_c'], label='Phase C Current (A)')
 plt.plot(t, data['velocity'], label='Velocity (rad/s)')
-plt.ylim(-100, 100)  # Adjust y-axis limits for better visibility
+plt.plot(t, data['torque'] * data['velocity'], label='mech. Power (W)')
+plt.plot(t, data['voltage_a'] * data['current_a'] + data['voltage_b'] * data['current_b'] + data['voltage_c'] * data['current_c'], label='el. Power (W)')
+plt.plot(t, copper_loss, label='Copper Loss (W)')
+plt.ylim(-20, 380)  # Adjust y-axis limits for better visibility
 
 plt.xlabel('Time (seconds)')
 plt.ylabel('Value')
 plt.title('tinyFOC Simulation Data')
 plt.legend()
 plt.grid(True)
+
+plt.figure()
+plt.plot(angle_deg, sns_angle, label='Angle Comparison')
 plt.show()

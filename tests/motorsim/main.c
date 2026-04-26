@@ -40,6 +40,7 @@ typedef struct {
 typedef struct {
     float angle;      // Mechanical radians
     float velocity;   // rad/s
+    float torque;     // Nm
     float current_a;  // Amps
     float current_b;
     float current_c;
@@ -62,14 +63,14 @@ BLDCState mybldc = {
 };
 
 BLDCConfig mybldc_config = {
-    .R = 0.5f,
-    .L = 0.015f,
-    .kv = 150.0f,
-    .ke = 60.0f / (SQRT3 * M_PI * 150.0f),
-    .J = 1e-4f,
+    .R = 0.3f,
+    .L = 0.0005f,
+    .kv = 20.0f,
+    .ke = .4,
+    .J = 1e-3f,
     .pole_pairs = 15,
-    .damping = 1e-4f,
-    .static_friction = 0.1f
+    .damping = 1e-2f,
+    .static_friction = 0.01f
 };
 
 HallSensor mysensor;
@@ -97,10 +98,12 @@ void update_motor(BLDCConfig* cfg, BLDCState* state, float v_a, float v_b, float
     float bemf_b = cfg->ke * state->velocity * sinf(ele_angle - 2.0f * M_PI / 3.0f);
     float bemf_c = cfg->ke * state->velocity * sinf(ele_angle + 2.0f * M_PI / 3.0f);
 
+    float v_neutral = (v_a + v_b + v_c) / 3.0f; // Neutral point voltage for wye connection
+
     // 3. Update Currents (V = I*R + L*di/dt + Bemf) -> di = (V - I*R - Bemf) * dt / L
-    state->current_a += (v_a - state->current_a * cfg->R - bemf_a) * dt / cfg->L;
-    state->current_b += (v_b - state->current_b * cfg->R - bemf_b) * dt / cfg->L;
-    state->current_c += (v_c - state->current_c * cfg->R - bemf_c) * dt / cfg->L;
+    state->current_a += ((v_a - v_neutral) - state->current_a * cfg->R - bemf_a) * dt / cfg->L;
+    state->current_b += ((v_b - v_neutral) - state->current_b * cfg->R - bemf_b) * dt / cfg->L;
+    state->current_c += ((v_c - v_neutral) - state->current_c * cfg->R - bemf_c) * dt / cfg->L;
 
     // 4. Calculate Torque (T = Kt * I)
     float torque = cfg->ke * (state->current_a * sinf(ele_angle) + 
@@ -118,6 +121,7 @@ void update_motor(BLDCConfig* cfg, BLDCState* state, float v_a, float v_b, float
     float accel = torque / cfg->J;
     state->velocity += accel * dt;
     state->angle += state->velocity * dt;
+    state->torque = torque + damping_torque + friction_torque; // Store total torque including damping and friction for logging
 
     // Keep angle in 0 to 2PI
     if (state->angle > 2.0f * M_PI) state->angle -= 2.0f * M_PI;
@@ -132,6 +136,7 @@ void update_motor(BLDCConfig* cfg, BLDCState* state, float v_a, float v_b, float
         LogEntry myentry = {
             .last_update = cmicros,
             .values = {mysensor.angle_cache + mymotor.sensor_offset, mysensor.hall_state, mysensor.direction, mysensor.electric_sector, mysensor.electric_rotations}
+            // .values = {mysensor.angle_cache, mysensor.hall_state, mysensor.direction, mysensor.electric_sector, mysensor.electric_rotations}
         };
         if (log_file_sns) {
             fwrite(&myentry, sizeof(LogEntry), 1, log_file_sns);
@@ -258,7 +263,7 @@ int main(void)
     mymotor.linkSensor(&mymotor, &mysensor.sensor);
     mymotor.sensor_direction = Direction_UNKNOWN;
     mymotor.zero_electric_angle = NOT_SET;
-    mymotor.controller = MotionControlType_torque;
+    mymotor.controller = MotionControlType_velocity;
     mymotor.torque_controller = TorqueControlType_voltage;
 
     mysensor.sensor.init(&mysensor.sensor);
@@ -268,7 +273,7 @@ int main(void)
 
     mymotor.initFOC(&mymotor);
 
-    mymotor.move(&mymotor, 10.0f); // Move to 10 rad/s
+    mymotor.move(&mymotor, 5); // Move to 5 rad/s
 
     for(int i = 0; i < 2000; i++){
         mymotor.loopFOC(&mymotor);

@@ -1140,6 +1140,18 @@ void FOCMotor_load_default(FOCMotor *motor)
     // current sensor
     motor->current_sense = NULL;
 
+    //filters and controllers
+    PIDController_init(&motor->PID_current_q, DEF_PID_CURR_P, DEF_PID_CURR_I, DEF_PID_CURR_D, DEF_PID_CURR_RAMP, DEF_POWER_SUPPLY, NOT_SET);
+    PIDController_init(&motor->PID_current_d, DEF_PID_CURR_P, DEF_PID_CURR_I, DEF_PID_CURR_D, DEF_PID_CURR_RAMP, DEF_POWER_SUPPLY, NOT_SET);
+    PIDController_init(&motor->PID_velocity, DEF_PID_VEL_P, DEF_PID_VEL_I, DEF_PID_VEL_D, DEF_PID_VEL_RAMP, DEF_PID_VEL_LIMIT, NOT_SET);
+    PIDController_init(&motor->P_angle, DEF_P_ANGLE_P, 0, 0, 0, DEF_VEL_LIM, NOT_SET);
+
+    LowPassFilter_init(&motor->LPF_current_q, DEF_CURR_FILTER_Tf, NOT_SET);
+    LowPassFilter_init(&motor->LPF_current_d, DEF_CURR_FILTER_Tf, NOT_SET);
+    LowPassFilter_init(&motor->LPF_velocity, DEF_VEL_FILTER_Tf, NOT_SET);
+    LowPassFilter_init(&motor->LPF_angle, 0.0f, NOT_SET);
+
+
     // default implementation
     motor->init = default_init;
     motor->linkSensor = default_linkSensor;
