@@ -1,6 +1,8 @@
 #ifndef FOCUTILS_LIB_H
 #define FOCUTILS_LIB_H
 
+#include "fixed_point.h"
+
 
 // sign function
 #define _sign(a) ( ( (a) < 0 )  ?  -1   : ( (a) > 0 ) )
@@ -30,7 +32,7 @@
 #define _PI_6 0.52359877559f
 #define _RPM_TO_RADS 0.10471975512f
 
-#define NOT_SET -12345.0f
+#define NOT_SET UINT32_MAX
 #define _HIGH_IMPEDANCE 0
 #define _HIGH_Z _HIGH_IMPEDANCE
 #define _ACTIVE 1

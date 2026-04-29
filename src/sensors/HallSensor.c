@@ -63,24 +63,23 @@ void HallSensor_update(Sensor *sns)
   long last_electric_rotations = hs->electric_rotations;
   int8_t last_electric_sector = hs->electric_sector;
   hs->sensor.angle_prev = ((float)((last_electric_rotations * 6 + last_electric_sector) % hs->cpr) / (float)hs->cpr) * _2PI;
-  hs->sensor.angle_prev -= (_PI / (float)hs->cpr);
   hs->sensor.full_rotations = (int32_t)((last_electric_rotations * 6 + last_electric_sector) / hs->cpr);
 
+  hs->angle_cache = hs->sensor.angle_prev;
   if(hs->newpulse){
     hs->newpulse = 0;
-    hs->angle_cache = hs->sensor.angle_prev; 
   }else{
-    unsigned long dt = _micros() - hs->pulse_timestamp;
-    if(dt > 100000 || hs->pulse_diff == 0)
+    if(hs->pulse_diff < 50000)
     {
-      // if it's been a long time since the last pulse, reset the angle cache to the current angle
-      hs->angle_cache = hs->sensor.angle_prev;
-    }else{
-      //try predicting the angle based on the time since the last pulse and the direction of rotation
-      if(dt < hs->pulse_diff){ // only predict if we are within the expected time of the next pulse, otherwise the prediction will be more wrong than just using the last angle 
-        hs->angle_cache = hs->sensor.angle_prev + hs->direction * (_2PI / (float)hs->cpr) * ((float)(dt) / (float)(hs->pulse_diff)); // add an offset to the angle based on the time since the last pulse and the direction of rotation
-      }else{
-        hs->angle_cache = hs->sensor.angle_prev + hs->direction * (_2PI / (float)hs->cpr);
+      unsigned long dt = _micros() - hs->pulse_timestamp;
+      if(dt < 500000 && hs->pulse_diff > 0)
+      {
+        //try predicting the angle based on the time since the last pulse and the direction of rotation
+        if(dt < hs->pulse_diff){ // only predict if we are within the expected time of the next pulse, otherwise the prediction will be more wrong than just using the last angle 
+          hs->angle_cache = hs->sensor.angle_prev + hs->direction * (_2PI / (float)hs->cpr) * ((float)(dt) / (float)(hs->pulse_diff)); // add an offset to the angle based on the time since the last pulse and the direction of rotation
+        }else{
+          hs->angle_cache = hs->sensor.angle_prev + hs->direction * (_2PI / (float)hs->cpr);
+        }
       }
     }
   }

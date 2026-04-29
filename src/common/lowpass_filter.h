@@ -10,11 +10,11 @@
  */
 typedef struct s_LowPassFilter
 {
-    int32_t Tf; //!< Low pass filter time constant
-    int32_t Ts; //!< Fixed sampling time (optional default NOT_SET)
+    uint32_t Tf; //!< Low pass filter time constant
+    uint32_t Ts; //!< Fixed sampling time (optional default NOT_SET)
 
     unsigned long timestamp_prev;  //!< Last execution timestamp
-    int32_t y_prev; //!< filtered value in previous execution step 
+    FIXP y_prev; //!< filtered value in previous execution step 
 } LowPassFilter;
 
 /**
@@ -27,6 +27,6 @@ typedef struct s_LowPassFilter
  *       variable in runtime.
  */
 LowPassFilter_init(LowPassFilter *lpf, uint32_t Tf_us, uint32_t Ts_us);
-int32_t LowPassFilter_update(LowPassFilter *lpf, int32_t x);
+FIXP LowPassFilter_update(LowPassFilter *lpf, FIXP x);
 
 #endif // LOWPASS_FILTER_H

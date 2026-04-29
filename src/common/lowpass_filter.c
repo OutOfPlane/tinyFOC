@@ -9,7 +9,7 @@ LowPassFilter_init(LowPassFilter *lpf, uint32_t time_constant_us, uint32_t sampl
 }
 
 
-int32_t LowPassFilter_update(LowPassFilter *lpf, int32_t x)
+FIXP LowPassFilter_update(LowPassFilter *lpf, FIXP x)
 {
     // initalise the elapsed time with the fixed sampling tims Ts
     uint32_t dt = lpf->Ts; 
@@ -30,10 +30,10 @@ int32_t LowPassFilter_update(LowPassFilter *lpf, int32_t x)
 
     // calculate the first order filer
     // alpha = Tf/(Tf + dt)
-    int32_t alpha = FIX_DIV(lpf->Tf, lpf->Tf + dt);
+    FIXP alpha = FIX_DIV(lpf->Tf, lpf->Tf + dt);
     // y = alpha*y_prev + (1 - alpha)*x
-    int32_t one_minus_alpha = FIX_ONE - alpha;
-    int32_t y = FIX_MUL(alpha, lpf->y_prev) + FIX_MUL(one_minus_alpha, x);
+    FIXP one_minus_alpha = FIX_ONE - alpha;
+    FIXP y = FIX_MUL(alpha, lpf->y_prev) + FIX_MUL(one_minus_alpha, x);
 
     // save the variables for the future steps
     lpf->y_prev = y;

@@ -12,16 +12,18 @@
 #define FIX_SHIFT 16
 #define FIX_ONE (1 << FIX_SHIFT)  // 65536
 #define FIX_HALF (1 << (FIX_SHIFT - 1))  // 32768
+#define FIXP int32_t
+#define DFIXP int64_t
 
 // Conversion macros
-#define FIX_FROM_FLOAT(f) ((int32_t)((f) * 65536.0f))
+#define FIX_FROM_FLOAT(f) ((FIXP)((f) * 65536.0f))
 #define FIX_TO_FLOAT(f) ((float)(f) / 65536.0f)
-#define FIX_FROM_INT(i) ((int32_t)(i) << FIX_SHIFT)
+#define FIX_FROM_INT(i) ((FIXP)(i) << FIX_SHIFT)
 
 // Arithmetic operations
-#define FIX_MUL(a, b) ((int64_t)(a) * (b) >> FIX_SHIFT)
-#define FIX_MUL_DIV_INT(a, b, c) (((int64_t)(a) * (b)) / (c))
-#define FIX_DIV(a, b) ((((int64_t)(a)) << FIX_SHIFT) / (b))
+#define FIX_MUL(a, b) ((DFIXP)(a) * (b) >> FIX_SHIFT)
+#define FIX_MUL_DIV_INT(a, b, c) (((DFIXP)(a) * (b)) / (c))
+#define FIX_DIV(a, b) ((((DFIXP)(a)) << FIX_SHIFT) / (b))
 #define FIX_ADD(a, b) ((a) + (b))
 #define FIX_SUB(a, b) ((a) - (b))
 

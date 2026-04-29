@@ -68,7 +68,7 @@ static float default_shaftVelocity(FOCMotor *motor)
     // if no sensor linked return previous value ( for open loop )
     if (!motor->sensor)
         return motor->shaft_velocity;
-    return motor->sensor_direction * LowPassFilter_update(&motor->LPF_velocity, motor->sensor->getVelocity(motor->sensor));
+    return motor->sensor_direction * FIX_TO_FLOAT(LowPassFilter_update(&motor->LPF_velocity, FIX_FROM_FLOAT(motor->sensor->getVelocity(motor->sensor))));
 }
 
 static float default_electricalAngle(FOCMotor *motor)
@@ -357,8 +357,8 @@ static void default_monitor(FOCMotor *motor)
         {
 
             c = CurrentSense_getFOCCurrents(motor->current_sense, motor->electrical_angle);
-            c.q = LowPassFilter_update(&(motor->LPF_current_q), c.q);
-            c.d = LowPassFilter_update(&(motor->LPF_current_d), c.d);
+            c.q = FIX_TO_FLOAT(LowPassFilter_update(&(motor->LPF_current_q), FIX_FROM_FLOAT(c.q)));;
+            c.d = FIX_TO_FLOAT(LowPassFilter_update(&(motor->LPF_current_d), FIX_FROM_FLOAT(c.d)));
         }
         if (motor->monitor_variables & _MON_CURR_Q)
         {
@@ -481,7 +481,7 @@ void FOCMotor_updateVelocityLimit(FOCMotor *motor, float new_velocity_limit)
 {
     motor->velocity_limit = new_velocity_limit;
     if (motor->controller != MotionControlType_angle_nocascade)
-        motor->P_angle.limit = _abs(motor->velocity_limit); // if angle control but no velocity cascade, limit the angle controller by the velocity limit
+        motor->P_angle.limit = FIX_FROM_FLOAT(_abs(motor->velocity_limit)); // if angle control but no velocity cascade, limit the angle controller by the velocity limit
 }
 
 // Update limit values in controllers when changed
@@ -491,10 +491,10 @@ void FOCMotor_updateCurrentLimit(FOCMotor *motor, float new_current_limit)
     if (motor->torque_controller != TorqueControlType_voltage)
     {
         // if current control
-        motor->PID_velocity.limit = new_current_limit;
+        motor->PID_velocity.limit = FIX_FROM_FLOAT(new_current_limit);
         if (motor->controller == MotionControlType_angle_nocascade)
             // if angle control but no velocity cascade, limit the angle controller by the current limit
-            motor->P_angle.limit = new_current_limit;
+            motor->P_angle.limit = FIX_FROM_FLOAT(new_current_limit);
     }
 }
 
@@ -503,15 +503,15 @@ void FOCMotor_updateCurrentLimit(FOCMotor *motor, float new_current_limit)
 void FOCMotor_updateVoltageLimit(FOCMotor *motor, float new_voltage_limit)
 {
     motor->voltage_limit = new_voltage_limit;
-    motor->PID_current_q.limit = new_voltage_limit;
-    motor->PID_current_d.limit = new_voltage_limit;
+    motor->PID_current_q.limit = FIX_FROM_FLOAT(new_voltage_limit);
+    motor->PID_current_d.limit = FIX_FROM_FLOAT(new_voltage_limit);
     if (motor->torque_controller == TorqueControlType_voltage)
     {
         // if voltage control
-        motor->PID_velocity.limit = new_voltage_limit;
+        motor->PID_velocity.limit = FIX_FROM_FLOAT(new_voltage_limit);
         if (motor->controller == MotionControlType_angle_nocascade)
             // if angle control but no velocity cascade, limit the angle controller by the voltage limit
-            motor->P_angle.limit = new_voltage_limit;
+            motor->P_angle.limit = FIX_FROM_FLOAT(new_voltage_limit);
     }
 }
 
@@ -675,7 +675,7 @@ static void default_loopFOC(FOCMotor *motor)
         if (_isset(motor->KV_rating))
             motor->voltage_bemf = motor->estimateBEMF(motor, motor->shaft_velocity);
         // filter the value values
-        motor->current.q = LowPassFilter_update(&(motor->LPF_current_q), motor->current_sp);
+        motor->current.q = FIX_TO_FLOAT(LowPassFilter_update(&(motor->LPF_current_q), FIX_FROM_FLOAT(motor->current_sp)));
         // calculate the phase voltage
         motor->voltage.q = motor->current.q * motor->phase_resistance + motor->voltage_bemf;
         // constrain voltage within limits
@@ -694,9 +694,9 @@ static void default_loopFOC(FOCMotor *motor)
         // read overall current magnitude
         motor->current.q = motor->current_sense->getDCCurrent(motor->current_sense, motor->electrical_angle);
         // filter the value values
-        motor->current.q = LowPassFilter_update(&(motor->LPF_current_q), motor->current.q);
+        motor->current.q = FIX_TO_FLOAT(LowPassFilter_update(&(motor->LPF_current_q), FIX_FROM_FLOAT(motor->current.q)));
         // calculate the phase voltage
-        motor->voltage.q = PIDController_update(&(motor->PID_current_q), motor->current_sp - motor->current.q) + motor->feed_forward_voltage.q;
+        motor->voltage.q = FIX_TO_FLOAT(PIDController_update(&(motor->PID_current_q), FIX_FROM_FLOAT(motor->current_sp - motor->current.q))) + motor->feed_forward_voltage.q;
         // d voltage  - lag compensation
         if (_isset(motor->axis_inductance.q))
             motor->voltage.d = _constrain(-motor->current_sp * motor->shaft_velocity * motor->pole_pairs * motor->axis_inductance.q, -motor->voltage_limit, motor->voltage_limit) + motor->feed_forward_voltage.d;
@@ -711,11 +711,11 @@ static void default_loopFOC(FOCMotor *motor)
         // read dq currents
         motor->current = CurrentSense_getFOCCurrents(motor->current_sense, motor->electrical_angle);
         // filter values
-        motor->current.q = LowPassFilter_update(&(motor->LPF_current_q), motor->current.q);
-        motor->current.d = LowPassFilter_update(&(motor->LPF_current_d), motor->current.d);
+        motor->current.q = FIX_TO_FLOAT(LowPassFilter_update(&(motor->LPF_current_q), FIX_FROM_FLOAT(motor->current.q)));
+        motor->current.d = FIX_TO_FLOAT(LowPassFilter_update(&(motor->LPF_current_d), FIX_FROM_FLOAT(motor->current.d)));
         // calculate the phase voltages
-        motor->voltage.q = PIDController_update(&(motor->PID_current_q), motor->current_sp - motor->current.q);
-        motor->voltage.d = PIDController_update(&(motor->PID_current_d), motor->feed_forward_current.d - motor->current.d);
+        motor->voltage.q = FIX_TO_FLOAT(PIDController_update(&(motor->PID_current_q), FIX_FROM_FLOAT(motor->current_sp - motor->current.q)));
+        motor->voltage.d = FIX_TO_FLOAT(PIDController_update(&(motor->PID_current_d), FIX_FROM_FLOAT(motor->feed_forward_current.d - motor->current.d)));
         // d voltage - lag compensation
         if (_isset(motor->axis_inductance.q))
             motor->voltage.d = _constrain(motor->voltage.d - motor->current_sp * motor->shaft_velocity * motor->pole_pairs * motor->axis_inductance.q, -motor->voltage_limit, motor->voltage_limit);
@@ -793,7 +793,7 @@ static void default_move(FOCMotor *motor, float new_target)
         // angle set point
         motor->shaft_angle_sp = motor->target;
         // calculate the torque command - sensor precision: this calculation is ok, but based on bad value from previous calculation
-        motor->current_sp = PIDController_update(&(motor->P_angle), motor->shaft_angle_sp - LowPassFilter_update(&motor->LPF_angle, motor->shaft_angle));
+        motor->current_sp = FIX_TO_FLOAT(PIDController_update(&(motor->P_angle), FIX_FROM_FLOAT(motor->shaft_angle_sp) - LowPassFilter_update(&motor->LPF_angle, FIX_FROM_FLOAT(motor->shaft_angle))));
         break;
     case MotionControlType_angle:
         // TODO sensor precision: this calculation is not numerically precise. The target value cannot express precise positions when
@@ -802,16 +802,16 @@ static void default_move(FOCMotor *motor, float new_target)
         // angle set point
         motor->shaft_angle_sp = motor->target;
         // calculate velocity set point
-        motor->shaft_velocity_sp = motor->feed_forward_velocity + PIDController_update(&(motor->P_angle), motor->shaft_angle_sp - LowPassFilter_update(&motor->LPF_angle, motor->shaft_angle));
+        motor->shaft_velocity_sp = motor->feed_forward_velocity + FIX_TO_FLOAT(PIDController_update(&(motor->P_angle), FIX_FROM_FLOAT(motor->shaft_angle_sp) - LowPassFilter_update(&motor->LPF_angle, FIX_FROM_FLOAT(motor->shaft_angle))));
         motor->shaft_velocity_sp = _constrain(motor->shaft_velocity_sp, -motor->velocity_limit, motor->velocity_limit);
         // calculate the torque command - sensor precision: this calculation is ok, but based on bad value from previous calculation
-        motor->current_sp = PIDController_update(&(motor->PID_velocity), motor->shaft_velocity_sp - motor->shaft_velocity);
+        motor->current_sp = FIX_TO_FLOAT(PIDController_update(&(motor->PID_velocity), FIX_FROM_FLOAT(motor->shaft_velocity_sp - motor->shaft_velocity)));
         break;
     case MotionControlType_velocity:
         // velocity set point - sensor precision: this calculation is numerically precise.
         motor->shaft_velocity_sp = motor->target;
         // calculate the torque command
-        motor->current_sp = PIDController_update(&(motor->PID_velocity), motor->shaft_velocity_sp - motor->shaft_velocity);
+        motor->current_sp = FIX_TO_FLOAT(PIDController_update(&(motor->PID_velocity), FIX_FROM_FLOAT(motor->shaft_velocity_sp - motor->shaft_velocity)));
         break;
     case MotionControlType_velocity_openloop:
         // velocity control in open loop - sensor precision: this calculation is numerically precise.
@@ -1111,6 +1111,7 @@ void FOCMotor_load_default(FOCMotor *motor)
     // Initialize phase voltages U alpha and U beta used for inverse Park and Clarke transform
     motor->Ualpha = 0;
     motor->Ubeta = 0;
+    motor->modulation_centered = 1;
 
     // monitor_port
     motor->monitor_port = NULL;
