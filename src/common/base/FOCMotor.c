@@ -59,7 +59,7 @@ static float default_shaftAngle(FOCMotor *motor)
     // if no sensor linked return previous value ( for open loop )
     if (!motor->sensor)
         return motor->shaft_angle;
-    return motor->sensor_direction * motor->sensor->getAngle(motor->sensor) - motor->sensor_offset;
+    return motor->sensor_direction * FIX_TO_FLOAT(motor->sensor->getAngle(motor->sensor)) - motor->sensor_offset;
 }
 
 // shaft velocity calculation
@@ -68,7 +68,7 @@ static float default_shaftVelocity(FOCMotor *motor)
     // if no sensor linked return previous value ( for open loop )
     if (!motor->sensor)
         return motor->shaft_velocity;
-    return motor->sensor_direction * FIX_TO_FLOAT(LowPassFilter_update(&motor->LPF_velocity, FIX_FROM_FLOAT(motor->sensor->getVelocity(motor->sensor))));
+    return motor->sensor_direction * FIX_TO_FLOAT(LowPassFilter_update(&motor->LPF_velocity, motor->sensor->getVelocity(motor->sensor)));
 }
 
 static float default_electricalAngle(FOCMotor *motor)
@@ -76,7 +76,7 @@ static float default_electricalAngle(FOCMotor *motor)
     // if no sensor linked return previous value ( for open loop )
     if (!motor->sensor)
         return motor->electrical_angle;
-    return _normalizeAngle((float)(motor->sensor_direction * motor->pole_pairs) * motor->sensor->getMechanicalAngle(motor->sensor) - motor->zero_electric_angle);
+    return _normalizeAngle((float)(motor->sensor_direction * motor->pole_pairs) * FIX_TO_FLOAT(motor->sensor->getMechanicalAngle(motor->sensor)) - motor->zero_electric_angle);
 }
 
 /**
@@ -153,8 +153,8 @@ static int default_characteriseMotor(FOCMotor *motor, float voltage, float corre
     // Start inductance measurement
     TinyFOC_MOTOR_DEBUG("Meas L...");
 
-    unsigned long t0 = 0;
-    unsigned long t1 = 0;
+    uint32_t t0 = 0;
+    uint32_t t1 = 0;
     float Ltemp = 0;
     float Ld = 0;
     float Lq = 0;
@@ -278,8 +278,8 @@ static int default_characteriseMotor(FOCMotor *motor, float voltage, float corre
          * We then report the one closest to the actual value. This could be useful if the zero search method is not reliable enough (eg. high pole count).
          */
 
-        float estimated_zero_electric_angle_A = _normalizeAngle((float)(motor->sensor_direction * motor->pole_pairs) * motor->sensor->getMechanicalAngle(motor->sensor) - d_electrical_angle);
-        float estimated_zero_electric_angle_B = _normalizeAngle((float)(motor->sensor_direction * motor->pole_pairs) * motor->sensor->getMechanicalAngle(motor->sensor) - d_electrical_angle + _PI);
+        float estimated_zero_electric_angle_A = _normalizeAngle((float)(motor->sensor_direction * motor->pole_pairs) * FIX_TO_FLOAT(motor->sensor->getMechanicalAngle(motor->sensor)) - d_electrical_angle);
+        float estimated_zero_electric_angle_B = _normalizeAngle((float)(motor->sensor_direction * motor->pole_pairs) * FIX_TO_FLOAT(motor->sensor->getMechanicalAngle(motor->sensor)) - d_electrical_angle + _PI);
         float estimated_zero_electric_angle = 0.0f;
         if (_abs(estimated_zero_electric_angle_A - motor->zero_electric_angle) < _abs(estimated_zero_electric_angle_B - motor->zero_electric_angle))
         {
@@ -416,7 +416,7 @@ static void default_monitor(FOCMotor *motor)
 float FOCMotor_velocityOpenloop(FOCMotor *motor, float target_velocity)
 {
     // get current timestamp
-    unsigned long now_us = _micros();
+    uint32_t now_us = _micros();
     // calculate the sample time from last call
     float Ts = (now_us - motor->open_loop_timestamp) * 1e-6f;
     // quick fix for strange cases (micros overflow + timestamp not defined)
@@ -443,7 +443,7 @@ float FOCMotor_velocityOpenloop(FOCMotor *motor, float target_velocity)
 float FOCMotor_angleOpenloop(FOCMotor *motor, float target_angle)
 {
     // get current timestamp
-    unsigned long now_us = _micros();
+    uint32_t now_us = _micros();
     // calculate the sample time from last call
     float Ts = (now_us - motor->open_loop_timestamp) * 1e-6f;
     // quick fix for strange cases (micros overflow + timestamp not defined)
@@ -969,7 +969,7 @@ int FOCMotor_alignSensor(FOCMotor *motor)
         }
         // take and angle in the middle
         motor->sensor->update(motor->sensor);
-        float mid_angle = motor->sensor->getAngle(motor->sensor);
+        float mid_angle = FIX_TO_FLOAT(motor->sensor->getAngle(motor->sensor));
         // move one electrical revolution backwards
         for (int i = 500; i >= 0; i--)
         {
@@ -979,7 +979,7 @@ int FOCMotor_alignSensor(FOCMotor *motor)
             _delay(2);
         }
         motor->sensor->update(motor->sensor);
-        float end_angle = motor->sensor->getAngle(motor->sensor);
+        float end_angle = FIX_TO_FLOAT(motor->sensor->getAngle(motor->sensor));
         // setPhaseVoltage(0, 0, 0);
         _delay(200);
         // determine the direction the sensor moved

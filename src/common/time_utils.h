@@ -10,15 +10,15 @@
 
  * @param ms number of milliseconds to wait
  */
-void _delay(unsigned long ms);
+void _delay(uint32_t ms);
 
-void _delay_us(unsigned long us);
+void _delay_us(uint32_t us);
 
 /** 
  * Function implementing timestamp getting function in microseconds
  * hardware specific
  */
-unsigned long (*_micros)(void);
+uint32_t (*_micros)(void);
 
 
 #endif

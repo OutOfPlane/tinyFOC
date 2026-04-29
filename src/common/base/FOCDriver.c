@@ -45,7 +45,7 @@ static int default_init(FOCDriver *driver)
 }
 
 // Set voltage to the pwm pin
-static void default_setPwm(FOCDriver *driver, float Ua, float Ub, float Uc)
+static void default_setPwm(FOCDriver *driver, FIXP Ua, FIXP Ub, FIXP Uc)
 {
     FOCDriver_ll *param = driver->ll;
     // limit the voltage in driver
@@ -54,9 +54,9 @@ static void default_setPwm(FOCDriver *driver, float Ua, float Ub, float Uc)
     Uc = _constrain(Uc, 0, driver->voltage_limit);
     // calculate duty cycle
     // limited in [0,1]
-    param->dcA = _constrain(Ua / driver->voltage_power_supply, 0.0f, 1.0f);
-    param->dcB = _constrain(Ub / driver->voltage_power_supply, 0.0f, 1.0f);
-    param->dcC = _constrain(Uc / driver->voltage_power_supply, 0.0f, 1.0f);
+    param->dcA = _constrain(FIX_DIV(Ua, driver->voltage_power_supply), 0, FIX_ONE);
+    param->dcB = _constrain(FIX_DIV(Ub, driver->voltage_power_supply), 0, FIX_ONE);
+    param->dcC = _constrain(FIX_DIV(Uc, driver->voltage_power_supply), 0, FIX_ONE);
     // hardware specific writing
     // hardware specific function - depending on driver and mcu
     param->setpwm(param, param->dcA, param->dcB, param->dcC);
@@ -88,6 +88,6 @@ void FOCDriver_load_default(FOCDriver *driver)
     driver->ll = NULL;
 
     // default power-supply value
-    driver->voltage_power_supply = DEF_POWER_SUPPLY;
+    driver->voltage_power_supply = DEF_POWER_SUPPLY_FIXP;
     driver->voltage_limit = NOT_SET;
 }

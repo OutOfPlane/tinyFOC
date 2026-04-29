@@ -1,7 +1,7 @@
 #ifndef SENSOR_H
 #define SENSOR_H
 
-#include <inttypes.h>
+#include "common/foc_utils.h"
 
 /**
  *  Direction structure
@@ -47,7 +47,7 @@ typedef struct s_Sensor{
          * the hardware. Base implementation uses the values returned by update() so that 
          * the same values are returned until update() is called again.
          */
-        float (*getMechanicalAngle)(struct s_Sensor *sns);
+        FIXP (*getMechanicalAngle)(struct s_Sensor *sns);
 
         /**
          * Get current position (in rad) including full rotations and shaft angle.
@@ -57,7 +57,7 @@ typedef struct s_Sensor{
          * because the limited precision of float can't capture the large angle of the full 
          * rotations and the small angle of the shaft angle at the same time.
          */
-        float (*getAngle)(struct s_Sensor *sns);
+        FIXP (*getAngle)(struct s_Sensor *sns);
         
         /** 
          * On architectures supporting it, this will return a double precision position value,
@@ -65,7 +65,7 @@ typedef struct s_Sensor{
          * Base implementation uses the values returned by update() so that the same
          * values are returned until update() is called again.
          */
-        double (*getPreciseAngle)(struct s_Sensor *sns);
+        FIXP (*getPreciseAngle)(struct s_Sensor *sns);
 
         /** 
          * Get current angular velocity (rad/s)
@@ -73,7 +73,7 @@ typedef struct s_Sensor{
          * returned by update() so that it only makes sense to call this if update()
          * has been called in the meantime.
          */
-        float (*getVelocity)(struct s_Sensor *sns);
+        FIXP (*getVelocity)(struct s_Sensor *sns);
 
         /**
          * Get the number of full rotations
@@ -104,7 +104,7 @@ typedef struct s_Sensor{
         /**
          * Minimum time between updates to velocity. If time elapsed is lower than this, the velocity is not updated.
          */
-        float min_elapsed_time; // default is 100 microseconds, or 10kHz
+        uint32_t min_elapsed_time; // default is 100 microseconds, or 10kHz
 
         /** 
          * Get current shaft angle from the sensor hardware, and 
@@ -114,7 +114,7 @@ typedef struct s_Sensor{
          * Calling this method directly does not update the base-class internal fields.
          * Use update() when calling from outside code.
          */
-        float (*getSensorAngle)(struct s_Sensor *sns);
+        FIXP (*getSensorAngle)(struct s_Sensor *sns);
         /**
          * Call Sensor::init() from your sensor subclass's init method if you want smoother startup
          * The base class init() method calls getSensorAngle() several times to initialize the internal fields
@@ -124,11 +124,11 @@ typedef struct s_Sensor{
         void (*init)(struct s_Sensor *sns);
 
         // velocity calculation variables
-        float velocity;
-        float angle_prev; // result of last call to getSensorAngle(), used for full rotations and velocity
-        long angle_prev_ts; // timestamp of last call to getAngle, used for velocity
-        float vel_angle_prev; // angle at last call to getVelocity, used for velocity
-        long vel_angle_prev_ts; // last velocity calculation timestamp
+        FIXP velocity;
+        FIXP angle_prev; // result of last call to getSensorAngle(), used for full rotations and velocity
+        uint32_t angle_prev_ts; // timestamp of last call to getAngle, used for velocity
+        FIXP vel_angle_prev; // angle at last call to getVelocity, used for velocity
+        uint32_t vel_angle_prev_ts; // last velocity calculation timestamp
         int32_t full_rotations; // full rotation tracking
         int32_t vel_full_rotations; // previous full rotation value for velocity calculation
         void *parent; // pointer to parent struct, e.g. HallSensor, MagneticSensor, Encoder, etc. Can be used to access specific fields of the subclass from the base class methods.

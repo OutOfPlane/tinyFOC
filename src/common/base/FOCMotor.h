@@ -3,8 +3,6 @@
 
 #include "Sensor.h"
 #include "CurrentSense.h"
-#include "stdint.h"
-#include "stdbool.h"
 
 #include "../time_utils.h"
 #include "../foc_utils.h"

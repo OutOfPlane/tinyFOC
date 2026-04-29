@@ -1,7 +1,7 @@
 #ifndef FOCDRIVER_H
 #define FOCDRIVER_H
 
-#include "stdbool.h"
+#include "common/foc_utils.h"
 
 enum PhaseState {
   PHASE_OFF = 0, // both sides of the phase are off
@@ -20,15 +20,15 @@ enum DriverType{
 
 typedef struct s_FOCDriver_ll{
        void (*init)(struct s_FOCDriver_ll *ll);
-       void (*setpwm)(struct s_FOCDriver_ll *ll, float dcA, float dcB, float dcC);
+       void (*setpwm)(struct s_FOCDriver_ll *ll, FIXP dcA, FIXP dcB, FIXP dcC);
        void (*enable)(struct s_FOCDriver_ll *ll);
        void (*disable)(struct s_FOCDriver_ll *ll);
        bool initOK;
        void *param;
 
-       float dcA;
-       float dcB;
-       float dcC;
+       FIXP dcA;
+       FIXP dcB;
+       FIXP dcC;
 } FOCDriver_ll;
 
 /**
@@ -47,8 +47,8 @@ typedef struct s_FOCDriver{
 
         FOCDriver_ll *ll; //hw level driver
 
-        float voltage_power_supply; //!< power supply voltage
-        float voltage_limit; //!< limiting voltage set to the motor
+        FIXP voltage_power_supply; //!< power supply voltage
+        FIXP voltage_limit; //!< limiting voltage set to the motor
 
         bool initialized; //!< true if driver was successfully initialized
 
@@ -61,7 +61,7 @@ typedef struct s_FOCDriver{
          * @param Ub - phase B voltage
          * @param Uc - phase C voltage
          */
-        void (*setPwm)(struct s_FOCDriver *fd, float Ua, float Ub, float Uc);
+        void (*setPwm)(struct s_FOCDriver *fd, FIXP Ua, FIXP Ub, FIXP Uc);
 
         /**
          * Set phase voltages to the harware

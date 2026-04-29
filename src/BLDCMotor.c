@@ -214,7 +214,7 @@ void BLDCMotor_setPhaseVoltage(FOCMotor *motor, float Uq, float Ud, float angle_
         //       off is longer than in centered modulation   
         //     - Both SinePWM and SpaceVectorPWM have the same form for non-centered modulation
       if (motor->modulation_centered) {
-        center = motor->driver->voltage_limit/2;
+        center = FIX_TO_FLOAT(motor->driver->voltage_limit)/2;
         if (motor->foc_modulation == FOCModulationType_SpaceVectorPWM){
           // discussed here: https://community.TinyFOC.com/t/embedded-world-2023-stm32-cordic-co-processor/3107/165?u=candas1
           // a bit more info here: https://microchipdeveloper.com/mct5001:which-zsm-is-best
@@ -236,7 +236,7 @@ void BLDCMotor_setPhaseVoltage(FOCMotor *motor, float Uq, float Ud, float angle_
   }
 
   // set the voltages in driver
-  motor->driver->setPwm(motor->driver, motor->Ua, motor->Ub, motor->Uc);
+  motor->driver->setPwm(motor->driver, FIX_FROM_FLOAT(motor->Ua), FIX_FROM_FLOAT(motor->Ub), FIX_FROM_FLOAT(motor->Uc));
 }
 
 

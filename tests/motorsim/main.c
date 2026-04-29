@@ -47,7 +47,7 @@ typedef struct {
     float voltage_a;  // Volts
     float voltage_b;  // Volts
     float voltage_c;  // Volts
-    unsigned long last_update; // Timestamp of the last state update
+    uint32_t last_update; // Timestamp of the last state update
 } BLDCState;
 
 BLDCState mybldc = {
@@ -78,14 +78,14 @@ FOCMotor mymotor;
 CurrentSense mycs;
 FOCDriver mydriver;
 
-unsigned long cmicros = 0;
-unsigned long lastprint = 0;
+uint32_t cmicros = 0;
+uint32_t lastprint = 0;
 
 FILE *log_file;
 FILE *log_file_sns;
 
 typedef struct{
-    unsigned long last_update;
+    uint32_t last_update;
     float values[5];
 } LogEntry;
 
@@ -135,7 +135,7 @@ void update_motor(BLDCConfig* cfg, BLDCState* state, float v_a, float v_b, float
 
         LogEntry myentry = {
             .last_update = cmicros,
-            .values = {mysensor.angle_cache + mymotor.sensor_offset, mysensor.hall_state, mysensor.direction, mysensor.electric_sector, mysensor.electric_rotations}
+            .values = {FIX_TO_FLOAT(mysensor.angle_cache) + mymotor.sensor_offset, mysensor.hall_state, mysensor.direction, mysensor.electric_sector, mysensor.electric_rotations}
             // .values = {mysensor.angle_cache, mysensor.hall_state, mysensor.direction, mysensor.electric_sector, mysensor.electric_rotations}
         };
         if (log_file_sns) {
@@ -145,7 +145,7 @@ void update_motor(BLDCConfig* cfg, BLDCState* state, float v_a, float v_b, float
 }
 
 
-unsigned long mymicros()
+uint32_t mymicros()
 {
     cmicros ++;
 
@@ -157,11 +157,11 @@ unsigned long mymicros()
     return cmicros;
 }
 
-void setPWM(FOCDriver_ll *driver, float dcA, float dcB, float dcC) {
+void setPWM(FOCDriver_ll *driver, FIXP dcA, FIXP dcB, FIXP dcC) {
     BLDCState* state = (BLDCState*)driver->param;
-    state->voltage_a = dcA *DEF_POWER_SUPPLY;
-    state->voltage_b = dcB *DEF_POWER_SUPPLY;
-    state->voltage_c = dcC *DEF_POWER_SUPPLY;
+    state->voltage_a = FIX_TO_FLOAT(dcA) *DEF_POWER_SUPPLY;
+    state->voltage_b = FIX_TO_FLOAT(dcB) *DEF_POWER_SUPPLY;
+    state->voltage_c = FIX_TO_FLOAT(dcC) *DEF_POWER_SUPPLY;
 
     _micros();
 }

@@ -5,7 +5,6 @@
 #include "../common/foc_utils.h"
 #include "../common/time_utils.h"
 #include "../common/lowpass_filter.h"
-#include "stdbool.h"
 
 
 
@@ -41,13 +40,12 @@ typedef struct s_HallSensor
   volatile uint8_t newpulse; // flag to indicate a new pulse has been detected since last update
 
   // variable used to filter outliers - rad/s
-  float velocity_max;
-  float angle_cache; // used to store the last angle value for outlier filtering
+  FIXP velocity_max;
+  FIXP angle_cache; // used to store the last angle value for outlier filtering
 
-  volatile unsigned long pulse_timestamp; //!< last impulse timestamp in us
-  volatile unsigned long pulse_diff;
+  volatile uint32_t pulse_timestamp; //!< last impulse timestamp in us
+  volatile uint32_t pulse_diff;
 
-  LowPassFilter LPF_adaptive; // low pass filter for velocity calculation with adaptive cutoff frequency based on velocity to better filter out noise at low speeds while still allowing good response at high speeds
 } HallSensor;
 
 void HallSensor_load_default(HallSensor *hs);

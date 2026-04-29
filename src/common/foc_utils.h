@@ -4,6 +4,7 @@
 #include "fixed_point.h"
 
 
+
 // sign function
 #define _sign(a) ( ( (a) < 0 )  ?  -1   : ( (a) > 0 ) )
 #ifndef _round

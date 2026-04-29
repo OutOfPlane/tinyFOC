@@ -13,7 +13,7 @@ void HallSensor_updateState(HallSensor *hs)
   if (new_hall_state == hs->hall_state)
     return;
 
-  unsigned long new_pulse_timestamp = _micros();
+  uint32_t new_pulse_timestamp = _micros();
   hs->hall_state = new_hall_state;
 
   int8_t new_electric_sector = ELECTRIC_SECTORS[hs->hall_state];
@@ -62,7 +62,7 @@ void HallSensor_update(Sensor *sns)
   hs->sensor.angle_prev_ts = hs->pulse_timestamp;
   long last_electric_rotations = hs->electric_rotations;
   int8_t last_electric_sector = hs->electric_sector;
-  hs->sensor.angle_prev = ((float)((last_electric_rotations * 6 + last_electric_sector) % hs->cpr) / (float)hs->cpr) * _2PI;
+  hs->sensor.angle_prev = FIX_MUL_DIV_INT((last_electric_rotations * 6 + last_electric_sector) % hs->cpr, FIX_2PI, hs->cpr); // calculate the angle within the current rotation based on the current sector, and add the full rotations. We use modulo here to avoid numerical precision issues when the electric rotations is large, which would cause the angle to grow to the point where small position changes are no longer captured by the precision of floats. This way the angle is always between 0 and 2PI, and we rely on the electric_rotations variable to track the full rotations.
   hs->sensor.full_rotations = (int32_t)((last_electric_rotations * 6 + last_electric_sector) / hs->cpr);
 
   hs->angle_cache = hs->sensor.angle_prev;
@@ -71,14 +71,14 @@ void HallSensor_update(Sensor *sns)
   }else{
     if(hs->pulse_diff < 50000)
     {
-      unsigned long dt = _micros() - hs->pulse_timestamp;
+      uint32_t dt = _micros() - hs->pulse_timestamp;
       if(dt < 500000 && hs->pulse_diff > 0)
       {
         //try predicting the angle based on the time since the last pulse and the direction of rotation
         if(dt < hs->pulse_diff){ // only predict if we are within the expected time of the next pulse, otherwise the prediction will be more wrong than just using the last angle 
-          hs->angle_cache = hs->sensor.angle_prev + hs->direction * (_2PI / (float)hs->cpr) * ((float)(dt) / (float)(hs->pulse_diff)); // add an offset to the angle based on the time since the last pulse and the direction of rotation
+          hs->angle_cache = hs->sensor.angle_prev + hs->direction * FIX_MUL_DIV_INT(FIX_2PI, dt, hs->pulse_diff) / (hs->cpr); // add an offset to the angle based on the time since the last pulse and the direction of rotation
         }else{
-          hs->angle_cache = hs->sensor.angle_prev + hs->direction * (_2PI / (float)hs->cpr);
+          hs->angle_cache = hs->sensor.angle_prev + hs->direction * (FIX_2PI / hs->cpr);
         }
       }
     }
@@ -89,13 +89,13 @@ void HallSensor_update(Sensor *sns)
   Shaft angle calculation
   TODO: numerical precision issue here if the electrical rotation overflows the angle will be lost
 */
-float HallSensor_getSensorAngle(Sensor *sns)
+static FIXP HallSensor_getSensorAngle(Sensor *sns)
 {
   HallSensor *hs = (HallSensor *)sns->parent;
-  return (float)sns->full_rotations * _2PI + hs->angle_cache;
+  return sns->full_rotations * FIX_2PI + hs->angle_cache;
 }
 
-static float HallSensor_getMechanicalAngle(Sensor *sns)
+static FIXP HallSensor_getMechanicalAngle(Sensor *sns)
 {
   HallSensor *hs = (HallSensor *)sns->parent;
   return hs->angle_cache;
@@ -105,19 +105,19 @@ static float HallSensor_getMechanicalAngle(Sensor *sns)
   Shaft velocity calculation
   function using mixed time and frequency measurement technique
 */
-float HallSensor_getVelocity(Sensor *sns)
+static FIXP HallSensor_getVelocity(Sensor *sns)
 {
   HallSensor *hs = (HallSensor *)sns->parent;
-  long last_pulse_timestamp = hs->pulse_timestamp;
-  long last_pulse_diff = hs->pulse_diff;
+  uint32_t last_pulse_timestamp = hs->pulse_timestamp;
+  uint32_t last_pulse_diff = hs->pulse_diff;
 
-  if (last_pulse_diff == 0 || ((long)(_micros() - last_pulse_timestamp) > last_pulse_diff * 2))
+  if (last_pulse_diff == 0 || ((_micros() - last_pulse_timestamp) > last_pulse_diff * 2))
   { // last velocity isn't accurate if too old
     return 0;
   }
   else
   {
-    return hs->direction * (_2PI / (float)hs->cpr) / (last_pulse_diff / 1000000.0f);
+    return hs->direction * FIX_MUL_DIV_INT(FIX_2PI, 1000000, last_pulse_diff) / hs->cpr;
   }
 }
 
@@ -135,8 +135,6 @@ void HallSensor_init(Sensor *sns)
   HallSensor_updateState(hs);
 
   hs->pulse_timestamp = _micros();
-
-  LowPassFilter_init(&hs->LPF_adaptive, .1f, NOT_SET); // default cutoff frequency of 10ms, will be adapted based on velocity
 }
 
 void HallSensor_load_default(HallSensor *hs)

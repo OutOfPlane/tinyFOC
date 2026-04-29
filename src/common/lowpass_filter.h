@@ -13,7 +13,7 @@ typedef struct s_LowPassFilter
     uint32_t Tf; //!< Low pass filter time constant
     uint32_t Ts; //!< Fixed sampling time (optional default NOT_SET)
 
-    unsigned long timestamp_prev;  //!< Last execution timestamp
+    uint32_t timestamp_prev;  //!< Last execution timestamp
     FIXP y_prev; //!< filtered value in previous execution step 
 } LowPassFilter;
 
