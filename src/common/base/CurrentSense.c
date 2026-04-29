@@ -5,7 +5,7 @@
 // get current magnitude
 //   - absolute  - if no electrical_angle provided
 //   - signed    - if angle provided
-static float default_getDCCurrent(CurrentSense *cs, float motor_electrical_angle)
+static FIXP default_getDCCurrent(CurrentSense *cs, FIXP motor_electrical_angle)
 {
     // read current phase currents
     PhaseCurrent_s current = cs->getPhaseCurrents(cs);
@@ -21,13 +21,13 @@ static float default_getDCCurrent(CurrentSense *cs, float motor_electrical_angle
     // sign(atan2(current.q, current.d)) is the same as c.q > 0 ? 1 : -1
     if (motor_electrical_angle)
     {
-        float ct;
-        float st;
-        _sincos(motor_electrical_angle, &st, &ct);
-        sign = (ABcurrent.beta * ct - ABcurrent.alpha * st) > 0 ? 1 : -1;
+        FIXP ct;
+        FIXP st;
+        fix_sincos(motor_electrical_angle, &st, &ct);
+        sign = (FIX_MUL(ABcurrent.beta, ct) - FIX_MUL(ABcurrent.alpha, st)) > 0 ? 1 : -1;
     }
     // return current magnitude
-    return _sqrt(ABcurrent.alpha * ABcurrent.alpha + ABcurrent.beta * ABcurrent.beta) * sign;
+    return fix_sqrt(FIX_MUL(ABcurrent.alpha, ABcurrent.alpha) + FIX_MUL(ABcurrent.beta, ABcurrent.beta)) * sign;
 }
 
 static void default_enable(CurrentSense *cs) {
@@ -92,7 +92,7 @@ static PhaseCurrent_s default_getPhaseCurrents(CurrentSense *cs)
 //   calculating DQ currents from phase currents
 //   - function calculating park and clarke transform of the phase currents
 //   - using getPhaseCurrents and getABCurrents internally
-DQCurrent_s CurrentSense_getFOCCurrents(CurrentSense *cs, float angle_el)
+DQCurrent_s CurrentSense_getFOCCurrents(CurrentSense *cs, FIXP angle_el)
 {
     // read current phase currents
     PhaseCurrent_s current = cs->getPhaseCurrents(cs);
@@ -146,35 +146,35 @@ ABCurrent_s CurrentSense_getABCurrents(CurrentSense *cs, PhaseCurrent_s current)
 
     // otherwise it's a BLDC motor and
     // calculate clarke transform
-    float i_alpha, i_beta;
+    FIXP i_alpha, i_beta;
     if (!current.c)
     {
         // if only two measured currents
         i_alpha = current.a;
-        i_beta = _1_SQRT3 * current.a + _2_SQRT3 * current.b;
+        i_beta = FIX_MUL(FIX_1_SQRT3, current.a) + FIX_MUL(FIX_2_SQRT3, current.b);
     }
     else if (!current.a)
     {
         // if only two measured currents
-        float a = -current.c - current.b;
+        FIXP a = -current.c - current.b;
         i_alpha = a;
-        i_beta = _1_SQRT3 * a + _2_SQRT3 * current.b;
+        i_beta = FIX_MUL(FIX_1_SQRT3, a) + FIX_MUL(FIX_2_SQRT3, current.b);
     }
     else if (!current.b)
     {
         // if only two measured currents
-        float b = -current.a - current.c;
+        FIXP b = -current.a - current.c;
         i_alpha = current.a;
-        i_beta = _1_SQRT3 * current.a + _2_SQRT3 * b;
+        i_beta = FIX_MUL(FIX_1_SQRT3, current.a) + FIX_MUL(FIX_2_SQRT3, b);
     }
     else
     {
         // signal filtering using identity a + b + c = 0. Assumes measurement error is normally distributed.
-        float mid = (1.f / 3) * (current.a + current.b + current.c);
-        float a = current.a - mid;
-        float b = current.b - mid;
+        FIXP mid = FIX_MUL(FIX_FROM_FLOAT(1.0f / 3.0f), current.a + current.b + current.c);
+        FIXP a = current.a - mid;
+        FIXP b = current.b - mid;
         i_alpha = a;
-        i_beta = _1_SQRT3 * a + _2_SQRT3 * b;
+        i_beta = FIX_MUL(FIX_1_SQRT3, a) + FIX_MUL(FIX_2_SQRT3, b);
     }
 
     ABCurrent_s return_ABcurrent;
@@ -186,15 +186,15 @@ ABCurrent_s CurrentSense_getABCurrents(CurrentSense *cs, PhaseCurrent_s current)
 // function used with the foc algorithm
 //   calculating D and Q currents from Alpha Beta currents and electrical angle
 //   - function calculating Clarke transform of the phase currents
-DQCurrent_s CurrentSense_getDQCurrents(CurrentSense *cs, ABCurrent_s current, float angle_el)
+DQCurrent_s CurrentSense_getDQCurrents(CurrentSense *cs, ABCurrent_s current, FIXP angle_el)
 {
     // calculate park transform
-    float ct;
-    float st;
-    _sincos(angle_el, &st, &ct);
+    FIXP ct;
+    FIXP st;
+    fix_sincos(angle_el, &st, &ct);
     DQCurrent_s return_current;
-    return_current.d = current.alpha * ct + current.beta * st;
-    return_current.q = current.beta * ct - current.alpha * st;
+    return_current.d = FIX_MUL(current.alpha, ct) + FIX_MUL(current.beta, st);
+    return_current.q = FIX_MUL(current.beta, ct) - FIX_MUL(current.alpha, st);
     return return_current;
 }
 
@@ -215,9 +215,9 @@ PhaseCurrent_s CurrentSense_readAverageCurrents(CurrentSense *cs, int N)
     for (int i = 0; i < N; i++)
     {
         PhaseCurrent_s c1 = cs->getPhaseCurrents(cs);
-        c.a = c.a * 0.6f + 0.4f * c1.a;
-        c.b = c.b * 0.6f + 0.4f * c1.b;
-        c.c = c.c * 0.6f + 0.4f * c1.c;
+        c.a = FIX_MUL(c.a, FIX_FROM_FLOAT(0.6f)) + FIX_MUL(c1.a, FIX_FROM_FLOAT(0.4f));
+        c.b = FIX_MUL(c.b, FIX_FROM_FLOAT(0.6f)) + FIX_MUL(c1.b, FIX_FROM_FLOAT(0.4f));
+        c.c = FIX_MUL(c.c, FIX_FROM_FLOAT(0.6f)) + FIX_MUL(c1.c, FIX_FROM_FLOAT(0.4f));
         _delay(3);
     }
     return c;
@@ -231,7 +231,7 @@ PhaseCurrent_s CurrentSense_readAverageCurrents(CurrentSense *cs, int N)
 // 2 - success but pins reconfigured
 // 3 - success but gains inverted
 // 4 - success but pins reconfigured and gains inverted
-static int CurrentSense_alignBLDCDriver(CurrentSense *cs, float voltage, FOCDriver *bldc_driver, bool modulation_centered)
+static int CurrentSense_alignBLDCDriver(CurrentSense *cs, FIXP voltage, FOCDriver *bldc_driver, bool modulation_centered)
 {
 
     // bool phases_switched = 0;
@@ -448,7 +448,7 @@ static int CurrentSense_alignBLDCDriver(CurrentSense *cs, float voltage, FOCDriv
 // 2 - success but pins reconfigured
 // 3 - success but gains inverted
 // 4 - success but pins reconfigured and gains inverted
-static int CurrentSense_alignStepperDriver(CurrentSense *cs, float voltage, FOCDriver *stepper_driver, bool modulation_centered)
+static int CurrentSense_alignStepperDriver(CurrentSense *cs, FIXP voltage, FOCDriver *stepper_driver, bool modulation_centered)
 {
 
     // _UNUSED(modulation_centered);
@@ -530,7 +530,7 @@ static int CurrentSense_alignStepperDriver(CurrentSense *cs, float voltage, FOCD
     // return exit_flag;
 }
 
-static int CurrentSense_alignHybridDriver(CurrentSense *cs, float voltage, FOCDriver *bldc_driver, bool modulation_centered)
+static int CurrentSense_alignHybridDriver(CurrentSense *cs, FIXP voltage, FOCDriver *bldc_driver, bool modulation_centered)
 {
 
     // _UNUSED(modulation_centered);
@@ -774,7 +774,7 @@ static int CurrentSense_alignHybridDriver(CurrentSense *cs, float voltage, FOCDr
 // 3 - success but gains inverted
 // 4 - success but pins reconfigured and gains inverted
 // IMPORTANT, this function can be overriden in the child class
-static int default_driverAlign(CurrentSense *cs, float voltage, bool modulation_centered)
+static int default_driverAlign(CurrentSense *cs, FIXP voltage, bool modulation_centered)
 {
 
     int exit_flag = 1;
@@ -808,4 +808,10 @@ void CurrentSense_load_default(CurrentSense *cs)
     cs->getDCCurrent = default_getDCCurrent;
     cs->enable = default_enable;
     cs->disable = default_disable;
+    cs->ll = NULL;
+    cs->driver = NULL;
+    cs->skip_align = true;
+    cs->initialized = false;
+    cs->driver_type = DriverType_UnknownDriver;
+    cs->params = NULL;
 }

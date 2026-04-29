@@ -16,7 +16,7 @@
 
 typedef struct s_CurrentSense_ll{
        void (*init)(struct s_CurrentSense_ll *ll);
-       float (*readcurrents)(struct s_CurrentSense_ll *ll, float *phA, float *phB, float *phC);
+       void (*readcurrents)(struct s_CurrentSense_ll *ll, FIXP *phA, FIXP *phB, FIXP *phC);
        bool initOK;
        void *param;
 } CurrentSense_ll;
@@ -47,7 +47,7 @@ typedef struct s_CurrentSense{
      * 
      * IMPORTANT: Default implementation provided in the CurrentSense class, but can be overriden in the child classes
      */
-    int (*driverAlign)(struct s_CurrentSense *cs, float align_voltage, bool modulation_centered);
+    int (*driverAlign)(struct s_CurrentSense *cs, FIXP align_voltage, bool modulation_centered);
 
     /**
      *  Function rading the phase currents a, b and c
@@ -66,7 +66,7 @@ typedef struct s_CurrentSense{
      *  
      * @param angle_el - electrical angle of the motor (optional) 
      */
-    float (*getDCCurrent)(struct s_CurrentSense *cs, float angle_el);
+    FIXP (*getDCCurrent)(struct s_CurrentSense *cs, FIXP angle_el);
 
     /**
      * enable the current sense. default implementation does nothing, but you can
@@ -92,18 +92,13 @@ typedef struct s_CurrentSense{
     // ADC measurement gain for each phase
     // support for different gains for different phases of more commonly - inverted phase currents
     // this should be automated later
-    float gain_a; //!< phase A gain
-    float gain_b; //!< phase B gain
-    float gain_c; //!< phase C gain
+    FIXP gain_a; //!< phase A gain
+    FIXP gain_b; //!< phase B gain
+    FIXP gain_c; //!< phase C gain
 
-    float offset_ia; //!< zero current A voltage value (center of the adc reading)
-    float offset_ib; //!< zero current B voltage value (center of the adc reading)
-    float offset_ic; //!< zero current C voltage value (center of the adc reading)
-
-    // hardware variables
-  	int pinA; //!< pin A analog pin for current measurement
-  	int pinB; //!< pin B analog pin for current measurement
-  	int pinC; //!< pin C analog pin for current measurement
+    FIXP offset_ia; //!< zero current A voltage value (center of the adc reading)
+    FIXP offset_ib; //!< zero current B voltage value (center of the adc reading)
+    FIXP offset_ic; //!< zero current C voltage value (center of the adc reading)
 
 } CurrentSense;
 
@@ -121,7 +116,7 @@ void CurrentSense_linkDriver(CurrentSense *cs, FOCDriver *driver);
  * 
  * @param angle_el - motor electrical angle
  */
-DQCurrent_s CurrentSense_getFOCCurrents(CurrentSense *cs, float angle_el);
+DQCurrent_s CurrentSense_getFOCCurrents(CurrentSense *cs, FIXP angle_el);
 
 /**
  * Function used for Clarke transform in FOC control
@@ -139,21 +134,21 @@ ABCurrent_s CurrentSense_getABCurrents(CurrentSense *cs, PhaseCurrent_s current)
  * 
  * @param current - phase current
  */
-DQCurrent_s CurrentSense_getDQCurrents(CurrentSense *cs, ABCurrent_s current,float angle_el);
+DQCurrent_s CurrentSense_getDQCurrents(CurrentSense *cs, ABCurrent_s current, FIXP angle_el);
 
 
 /**
  * Function used to align the current sense with the BLDC motor driver
 */
-int CurrentSense_alignBLDCDriver(CurrentSense *cs, float align_voltage, FOCDriver* driver, bool modulation_centered);
+int CurrentSense_alignBLDCDriver(CurrentSense *cs, FIXP align_voltage, FOCDriver* driver, bool modulation_centered);
 /**
  * Function used to align the current sense with the Stepper motor driver
 */
-int CurrentSense_alignStepperDriver(CurrentSense *cs, float align_voltage, FOCDriver* driver, bool modulation_centered);
+int CurrentSense_alignStepperDriver(CurrentSense *cs, FIXP align_voltage, FOCDriver* driver, bool modulation_centered);
 /**
  * Function used to align the current sense with the Hybrid motor driver
  */
-int CurrentSense_alignHybridDriver(CurrentSense *cs, float align_voltage, FOCDriver* driver, bool modulation_centered);
+int CurrentSense_alignHybridDriver(CurrentSense *cs, FIXP align_voltage, FOCDriver* driver, bool modulation_centered);
 
 /**
  * Function used to read the average current values over N samples

@@ -44,8 +44,8 @@
 // dq variables
 struct DQ_s
 {
-    float d;
-    float q;
+    FIXP d;
+    FIXP q;
 };
 
 // dq voltage structs
@@ -56,8 +56,8 @@ typedef struct DQ_s DQCurrent_s;
 // alpha-beta variables    
 struct AB_s
 {
-    float alpha;
-    float beta;
+    FIXP alpha;
+    FIXP beta;
 };
 typedef struct AB_s ABVoltage_s;  // NOT USED
 typedef struct AB_s ABCurrent_s;
@@ -65,9 +65,9 @@ typedef struct AB_s ABCurrent_s;
 // phase structs
 struct Phase_s
 {
-    float a;
-    float b;
-    float c;
+    FIXP a;
+    FIXP b;
+    FIXP c;
 };
 typedef struct Phase_s PhaseVoltage_s; // NOT USED
 typedef struct Phase_s PhaseCurrent_s;

@@ -29,7 +29,7 @@ enum Pullup {
  * most basic common features so that a FOC driver can obtain the data it needs for operation.
  * 
  * To implement your own sensors, create a sub-class of this class, and implement the getSensorAngle()
- * method. getSensorAngle() returns a float value, in radians, representing the current shaft angle in the
+ * method. getSensorAngle() returns a FIXP value, in radians, representing the current shaft angle in the
  * range 0 to 2*PI (one full turn). 
  * 
  * To function correctly, the sensor class update() method has to be called sufficiently quickly. Normally,
@@ -54,7 +54,7 @@ typedef struct s_Sensor{
          * Base implementation uses the values returned by update() so that the same
          * values are returned until update() is called again.
          * Note that this value has limited precision as the number of rotations increases,
-         * because the limited precision of float can't capture the large angle of the full 
+         * because the limited precision of FIXP can't capture the large angle of the full 
          * rotations and the small angle of the shaft angle at the same time.
          */
         FIXP (*getAngle)(struct s_Sensor *sns);
@@ -108,7 +108,7 @@ typedef struct s_Sensor{
 
         /** 
          * Get current shaft angle from the sensor hardware, and 
-         * return it as a float in radians, in the range 0 to 2PI.
+         * return it as a FIXP in radians, in the range 0 to 2PI.
          * 
          * This method is pure virtual and must be implemented in subclasses.
          * Calling this method directly does not update the base-class internal fields.

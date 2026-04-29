@@ -180,11 +180,11 @@ uint8_t get_hall_state(HallSensor_ll *ll) {
     return (h1 << 2) | (h2 << 1) | h3;
 }
 
-void readCurrents(CurrentSense_ll *ll, float* i_a, float* i_b, float* i_c) {
+void readCurrents(CurrentSense_ll *ll, FIXP* i_a, FIXP* i_b, FIXP* i_c) {
     BLDCState* state = (BLDCState*)ll->param;
-    *i_a = state->current_a;
-    *i_b = state->current_b;
-    *i_c = state->current_c;
+    *i_a = FIX_FROM_FLOAT(state->current_a);
+    *i_b = FIX_FROM_FLOAT(state->current_b);
+    *i_c = FIX_FROM_FLOAT(state->current_c);
 }
 
 void noop(void *np){
