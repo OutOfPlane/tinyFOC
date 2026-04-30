@@ -21,6 +21,8 @@
 #define FIX_TO_FLOAT(f) ((float)(f) / 65536.0f)
 #define FIX_FROM_INT(i) ((FIXP)(i) << FIX_SHIFT)
 
+#define us_per_s 1000000
+
 // Arithmetic operations
 #define FIX_MUL(a, b) ((DFIXP)(a) * (b) >> FIX_SHIFT)
 #define FIX_MUL_DIV_INT(a, b, c) (((DFIXP)(a) * (b)) / (c))
@@ -52,6 +54,8 @@
 #define FIX_PI FIX_FROM_FLOAT(3.14159265359f)
 #define FIX_PI_2 FIX_FROM_FLOAT(1.57079632679f)
 #define FIX_PI_3 FIX_FROM_FLOAT(1.0471975512f)
+#define FIX_PI_4 FIX_FROM_FLOAT(0.78539816339f)
+#define FIX_PI_8 FIX_FROM_FLOAT(0.39269908169f)
 #define FIX_2PI FIX_FROM_FLOAT(6.28318530718f)
 #define FIX_3PI_2 FIX_FROM_FLOAT(4.71238898038f)
 #define FIX_PI_6 FIX_FROM_FLOAT(0.52359877559f)

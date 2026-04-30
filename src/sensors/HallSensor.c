@@ -117,7 +117,7 @@ static FIXP HallSensor_getVelocity(Sensor *sns)
   }
   else
   {
-    return hs->direction * FIX_MUL_DIV_INT(FIX_2PI, 1000000, last_pulse_diff) / hs->cpr;
+    return hs->direction * FIX_MUL_DIV_INT(FIX_2PI, us_per_s, last_pulse_diff) / hs->cpr;
   }
 }
 

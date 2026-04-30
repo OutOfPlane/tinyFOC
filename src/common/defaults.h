@@ -4,8 +4,8 @@
 #define DEF_POWER_SUPPLY 12.0f //!< default power supply voltage
 #define DEF_POWER_SUPPLY_FIXP FIX_FROM_FLOAT(DEF_POWER_SUPPLY) //!< default power supply voltage
 // velocity PI controller params
-#define DEF_PID_VEL_P FIX_FROM_FLOAT(0.5f) //!< default PID controller P value
-#define DEF_PID_VEL_I FIX_FROM_FLOAT(10.0f) //!<  default PID controller I value
+#define DEF_PID_VEL_P FIX_FROM_FLOAT(0.1f) //!< default PID controller P value
+#define DEF_PID_VEL_I FIX_FROM_FLOAT(2.0f) //!<  default PID controller I value
 #define DEF_PID_VEL_D FIX_FROM_FLOAT(0.0f) //!<  default PID controller D value
 #define DEF_PID_VEL_RAMP NOT_SET //!< default PID controller voltage ramp value
 #define DEF_PID_VEL_LIMIT FIX_FROM_FLOAT(DEF_POWER_SUPPLY) //!< default PID controller voltage limit
@@ -45,10 +45,12 @@
 
 // index search
 #define DEF_INDEX_SEARCH_TARGET_VELOCITY 1.0f //!< default index search velocity
+#define DEF_INDEX_SEARCH_TARGET_VELOCITY_FIXP FIX_FROM_FLOAT(DEF_INDEX_SEARCH_TARGET_VELOCITY) //!< default index search velocity
 // align voltage
 #define DEF_VOLTAGE_SENSOR_ALIGN 3.0f //!< default voltage for sensor and motor zero alignemt
+#define DEF_VOLTAGE_SENSOR_ALIGN_FIXP FIX_FROM_FLOAT(DEF_VOLTAGE_SENSOR_ALIGN) //!< default voltage for sensor and motor zero alignemt
 // low pass filter velocity
-#define DEF_VEL_FILTER_Tf ((uint32_t)(1e6f*0.005f)) //!< default velocity filter time constant
+#define DEF_VEL_FILTER_Tf ((uint32_t)(1e6f*0.1f)) //!< default velocity filter time constant
 
 // current sense default parameters
 #define DEF_LPF_PER_PHASE_CURRENT_SENSE_Tf ((uint32_t)(1e6f*0.0f))  //!< default currnet sense per phase low pass filter time constant 

@@ -33,7 +33,7 @@
 #define _PI_6 0.52359877559f
 #define _RPM_TO_RADS 0.10471975512f
 
-#define NOT_SET UINT32_MAX
+#define NOT_SET INT32_MAX
 #define _HIGH_IMPEDANCE 0
 #define _HIGH_Z _HIGH_IMPEDANCE
 #define _ACTIVE 1
@@ -72,81 +72,15 @@ struct Phase_s
 typedef struct Phase_s PhaseVoltage_s; // NOT USED
 typedef struct Phase_s PhaseCurrent_s;
 
-
-/**
- *  Function approximating the sine calculation by using fixed size array
- * - execution time ~40us (Arduino UNO)
- *
- * @param a angle in between 0 and 2PI
- */
-float _sin(float a);
-
-
-/**
- *  get the absolute value
- *
- * @param a any float
- */
-float _abs(float a);
-
-/**
- *  get the log value
- *
- * @param a any float
- */
-float _log(float a);
-
 #define min(X, Y) (X > Y ? Y : X)
 #define max(X, Y) (X > Y ? X : Y)
-
-/**
- * Function approximating cosine calculation by using fixed size array
- * - execution time ~50us (Arduino UNO)
- *
- * @param a angle in between 0 and 2PI
- */
-float _cos(float a);
-/**
- * Function returning both sine and cosine of the angle in one call.
- * Internally it uses the _sin and _cos functions, but you may wish to
- * provide your own implementation which is more optimized.
- */
-void _sincos(float a, float* s, float* c);
-
-/**
- * Function approximating atan2 
- * 
- */
-float _atan2(float y, float x);
-
-/**
- * normalizing radian angle to [0,2PI]
- * @param angle - angle to be normalized
- */
-float _normalizeAngle(float angle);
-
-
-/**
- * Electrical angle calculation
- *
- * @param shaft_angle - shaft angle of the motor
- * @param pole_pairs - number of pole pairs
- */
-float _electricalAngle(float shaft_angle, int pole_pairs);
-
-/**
- * Function approximating square root function
- *  - using fast inverse square root
- *
- * @param value - number
- */
-float _sqrtApprox(float value);
+#define _abs(X) (X > 0 ? X : -X)
 
 typedef struct{
     void (*write)(char val);
     void (*newline)(void);
     void (*print)(char* msg);
-    void (*print_f)(float val, int digits);
+    void (*print_f)(FIXP val, int digits);
     int (*read)(char* val, int len);
 }Print;
 

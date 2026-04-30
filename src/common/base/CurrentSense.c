@@ -237,7 +237,7 @@ static int CurrentSense_alignBLDCDriver(CurrentSense *cs, FIXP voltage, FOCDrive
     // bool phases_switched = 0;
     // bool phases_inverted = 0;
 
-    // float zero = 0;
+    // FIXP zero = 0;
     // if(modulation_centered) zero = cs->driver->voltage_limit/2.0;
 
     // // set phase A active and phases B and C down

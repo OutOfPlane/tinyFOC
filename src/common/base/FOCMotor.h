@@ -125,14 +125,14 @@ typedef struct s_FOCMotor{
   * @param Ud Current voltage in d axis to set to the motor
   * @param angle_el current electrical angle of the motor
   */
- void (*setPhaseVoltage)(struct s_FOCMotor *motor, float Uq, float Ud, float angle_el);
+ void (*setPhaseVoltage)(struct s_FOCMotor *motor, FIXP Uq, FIXP Ud, FIXP angle_el);
 
   /**
   * Estimation of the Back EMF voltage
   * 
   * @param velocity - current shaft velocity
   */
-  float (*estimateBEMF)(struct s_FOCMotor *motor, float velocity);
+  FIXP (*estimateBEMF)(struct s_FOCMotor *motor, FIXP velocity);
 
   /**
    * Function initializing FOC algorithm
@@ -158,7 +158,7 @@ typedef struct s_FOCMotor{
    * 
    * This function doesn't need to be run upon each loop execution - depends of the use case
    */
-  void (*move)(struct s_FOCMotor *motor, float target);
+  void (*move)(struct s_FOCMotor *motor, FIXP target);
 
   /**
    * Function linking a motor and a sensor 
@@ -183,17 +183,17 @@ typedef struct s_FOCMotor{
 
   // State calculation methods 
   /** Shaft angle calculation in radians [rad] */
-  float (*shaftAngle)(struct s_FOCMotor *motor);
+  FIXP (*shaftAngle)(struct s_FOCMotor *motor);
   /** 
    * Shaft angle calculation function in radian per second [rad/s]
    * It implements low pass filtering
    */
-  float (*shaftVelocity)(struct s_FOCMotor *motor);
+  FIXP (*shaftVelocity)(struct s_FOCMotor *motor);
 
   /** 
    * Electrical angle calculation  
    */
-  float (*electricalAngle)(struct s_FOCMotor *motor);
+  FIXP (*electricalAngle)(struct s_FOCMotor *motor);
 
 
   /**
@@ -203,7 +203,7 @@ typedef struct s_FOCMotor{
    * @param correction_factor  Is 1.5 for 3 phase motors, because we measure over a series-parallel connection. TODO: what about 2 phase motors?
    * @returns 0 for success, >0 for failure
    */
-  int (*characteriseMotor)(struct s_FOCMotor *motor, float voltage, float correction_factor);
+  int (*characteriseMotor)(struct s_FOCMotor *motor, FIXP voltage, FIXP correction_factor);
 
   /**
    * Auto-tune the current controller PID parameters based on desired bandwidth.
@@ -213,40 +213,40 @@ typedef struct s_FOCMotor{
    * @param bandwidth Desired closed-loop bandwidth in Hz.
    * @returns returns 0 for success, >0 for failure
    */
-  int (*tuneCurrentController)(struct s_FOCMotor *motor, float bandwidth);
+  int (*tuneCurrentController)(struct s_FOCMotor *motor, FIXP bandwidth);
 
   // state variables
-  float target; //!< current target value - depends of the controller
-  float feed_forward_velocity; //!< current feed forward velocity
-  float shaft_angle;//!< current motor angle
-  float electrical_angle;//!< current electrical angle
-  float shaft_velocity;//!< current motor velocity 
-  float current_sp;//!< target current ( q current )
-  float shaft_velocity_sp;//!< current target velocity
-  float shaft_angle_sp;//!< current target angle
+  FIXP target; //!< current target value - depends of the controller
+  FIXP feed_forward_velocity; //!< current feed forward velocity
+  FIXP shaft_angle;//!< current motor angle
+  FIXP electrical_angle;//!< current electrical angle
+  FIXP shaft_velocity;//!< current motor velocity 
+  FIXP current_sp;//!< target current ( q current )
+  FIXP shaft_velocity_sp;//!< current target velocity
+  FIXP shaft_angle_sp;//!< current target angle
   DQVoltage_s voltage;//!< current d and q voltage set to the motor
   DQCurrent_s current;//!< current d and q current measured
-  float voltage_bemf; //!< estimated backemf voltage (if provided KV constant)
-  float	Ualpha, Ubeta; //!< Phase voltages U alpha and U beta used for inverse Park and Clarke transform
+  FIXP voltage_bemf; //!< estimated backemf voltage (if provided KV constant)
+  FIXP	Ualpha, Ubeta; //!< Phase voltages U alpha and U beta used for inverse Park and Clarke transform
 
   DQCurrent_s feed_forward_current;//!< current d and q current measured
   DQVoltage_s feed_forward_voltage;//!< current d and q voltage set to the motor
 
   // motor configuration parameters
-  float voltage_sensor_align;//!< sensor and motor align voltage parameter
-  float velocity_index_search;//!< target velocity for index search 
+  FIXP voltage_sensor_align;//!< sensor and motor align voltage parameter
+  FIXP velocity_index_search;//!< target velocity for index search 
   
   // motor physical parameters
-  float	phase_resistance; //!< motor phase resistance
+  FIXP	phase_resistance; //!< motor phase resistance
   int pole_pairs;//!< motor pole pairs number
-  float KV_rating; //!< motor KV rating
-  float	phase_inductance; //!< motor phase inductance q axis - FOR BACKWARDS COMPATIBILITY
+  FIXP KV_rating; //!< motor KV rating
+  FIXP	phase_inductance; //!< motor phase inductance q axis - FOR BACKWARDS COMPATIBILITY
   struct DQ_s axis_inductance; //!< motor direct axis phase inductance
 
   // limiting variables
-  float voltage_limit; //!< Voltage limiting variable - global limit
-  float current_limit; //!< Current limiting variable - global limit
-  float velocity_limit; //!< Velocity limiting variable - global limit
+  FIXP voltage_limit; //!< Voltage limiting variable - global limit
+  FIXP current_limit; //!< Current limiting variable - global limit
+  FIXP velocity_limit; //!< Velocity limiting variable - global limit
 
   // motor status vairables
   int8_t enabled;//!< enabled or disabled motor flag
@@ -274,12 +274,12 @@ typedef struct s_FOCMotor{
   unsigned int motion_cnt; //!< counting variable for downsampling for move commad
 
   // sensor related variabels
-  float sensor_offset; //!< user defined sensor zero offset
-  float zero_electric_angle;//!< absolute zero electric angle - if available
+  FIXP sensor_offset; //!< user defined sensor zero offset
+  FIXP zero_electric_angle;//!< absolute zero electric angle - if available
   enum Direction sensor_direction; //!< default is CW. if sensor_direction == Direction::CCW then direction will be flipped compared to CW. Set to UNKNOWN to set by calibration
   bool pp_check_result; //!< the result of the PP check, if run during loopFOC
 
-  float Ua, Ub, Uc; //!< Current phase voltages Ua,Ub and Uc set to motor
+  FIXP Ua, Ub, Uc; //!< Current phase voltages Ua,Ub and Uc set to motor
 
   FOCDriver *driver; //!< FOCDriver instance
 
@@ -333,7 +333,7 @@ typedef struct s_FOCMotor{
   uint32_t open_loop_timestamp;
   
   // function pointer for custom control method
-  float (*customMotionControlCallback)(struct s_FOCMotor *motor);
+  FIXP (*customMotionControlCallback)(struct s_FOCMotor *motor);
 
 } FOCMotor;
 
@@ -348,7 +348,7 @@ void FOCMotor_load_default(FOCMotor *motor);
  *  - motor.velocity_limit
  *  - motor.P_angle.limit
  */
-void FOCMotor_updateVelocityLimit(FOCMotor *motor, float new_velocity_limit);
+void FOCMotor_updateVelocityLimit(FOCMotor *motor, FIXP new_velocity_limit);
 
 /**
  * Update limit values in controllers when changed
@@ -358,7 +358,7 @@ void FOCMotor_updateVelocityLimit(FOCMotor *motor, float new_velocity_limit);
  *  - motor.current_limit
  *  - motor.PID_velocity.limit (if current control)
  */
-void FOCMotor_updateCurrentLimit(FOCMotor *motor, float new_current_limit);
+void FOCMotor_updateCurrentLimit(FOCMotor *motor, FIXP new_current_limit);
 /**
  * Update limit values in controllers when changed
  * @param new_voltage_limit - new voltage limit value
@@ -369,7 +369,7 @@ void FOCMotor_updateCurrentLimit(FOCMotor *motor, float new_current_limit);
  *  - motor.PID_current_d.limit
  *  - motor.PID_velocity.limit (if voltage control)
  */
-void FOCMotor_updateVoltageLimit(FOCMotor *motor, float new_voltage_limit);
+void FOCMotor_updateVoltageLimit(FOCMotor *motor, FIXP new_voltage_limit);
 
 /**
  * Update torque control type and related controller limit values
@@ -396,22 +396,22 @@ void FOCMotor_updateMotionControlType(FOCMotor *motor, enum MotionControlType ne
  * 
  * @param target_velocity - rad/s
  */
-float FOCMotor_velocityOpenloop(FOCMotor *motor, float target_velocity);
+FIXP FOCMotor_velocityOpenloop(FOCMotor *motor, FIXP target_velocity);
 /**
  * Function (iterative) generating open loop movement towards the target angle
  * it uses voltage_limit and velocity_limit variables
  * 
  * @param target_angle - rad
  */
-float FOCMotor_angleOpenloop(FOCMotor *motor, float target_angle);
+FIXP FOCMotor_angleOpenloop(FOCMotor *motor, FIXP target_angle);
 
 
 /**
  * Function setting a custom motion control method defined by the user
- * @note the custom control method has to be defined by the user and should follow the signature: float controlMethod(FOCMotor* motor)
+ * @note the custom control method has to be defined by the user and should follow the signature: FIXP controlMethod(FOCMotor* motor)
  * @param controlMethod - pointer to the custom control method function defined by the user
  */
-void FOCMotor_linkCustomMotionControl(FOCMotor *motor, float (*controlMethod)(FOCMotor* motor));
+void FOCMotor_linkCustomMotionControl(FOCMotor *motor, FIXP (*controlMethod)(FOCMotor* motor));
 
 /**
  * Function udating loop time measurement

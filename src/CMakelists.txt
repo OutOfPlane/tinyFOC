@@ -4,7 +4,6 @@ add_library(tinyfoc
     common/base/FOCDriver.c
     common/base/FOCMotor.c
     common/base/Sensor.c
-    common/foc_utils.c
     common/fixed_point.c
     common/lowpass_filter.c
     common/pid.c

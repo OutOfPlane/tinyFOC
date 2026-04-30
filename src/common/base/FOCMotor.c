@@ -2,27 +2,28 @@
 
 // time measuring function
 // It filters the value using low pass filtering alpha = 0.1
-static void updateTime(uint32_t *elapsed_time_filetered, uint32_t *elapsed_time, uint32_t *last_timestamp_us, float alpha)
+static void updateTime(uint32_t *elapsed_time, uint32_t *last_timestamp_us)
 {
     uint32_t now = _micros();
     *elapsed_time = now - *last_timestamp_us;
-    *elapsed_time_filetered = (uint32_t)((1 - alpha) * *elapsed_time_filetered + alpha * *elapsed_time);
     *last_timestamp_us = now;
 }
 
-static void linkCustomMotionControl(FOCMotor *motor, float (*controlMethod)(FOCMotor *motor))
+static void linkCustomMotionControl(FOCMotor *motor, FIXP (*controlMethod)(FOCMotor *motor))
 {
     motor->customMotionControlCallback = controlMethod;
 }
 
 static void updateLoopFOCTime(FOCMotor *motor)
 {
-    updateTime(&(motor->loopfoc_time_us), &(motor->last_loopfoc_time_us), &(motor->last_loopfoc_timestamp_us), 0.1f);
+    motor->last_loopfoc_time_us = motor->loopfoc_time_us;
+    updateTime(&(motor->loopfoc_time_us), &(motor->last_loopfoc_timestamp_us));
 }
 
 static void updateMotionControlTime(FOCMotor *motor)
 {
-    updateTime(&(motor->move_time_us), &(motor->last_move_time_us), &(motor->last_move_timestamp_us), 0.1f);
+    motor->last_move_time_us = motor->move_time_us;
+    updateTime(&(motor->move_time_us), &(motor->last_move_timestamp_us));
 }
 
 static void default_init(FOCMotor *motor)
@@ -54,29 +55,29 @@ static void default_linkCurrentSense(FOCMotor *motor, CurrentSense *_current_sen
 }
 
 // shaft angle calculation
-static float default_shaftAngle(FOCMotor *motor)
+static FIXP default_shaftAngle(FOCMotor *motor)
 {
     // if no sensor linked return previous value ( for open loop )
     if (!motor->sensor)
         return motor->shaft_angle;
-    return motor->sensor_direction * FIX_TO_FLOAT(motor->sensor->getAngle(motor->sensor)) - motor->sensor_offset;
+    return motor->sensor_direction * motor->sensor->getAngle(motor->sensor) - motor->sensor_offset;
 }
 
 // shaft velocity calculation
-static float default_shaftVelocity(FOCMotor *motor)
+static FIXP default_shaftVelocity(FOCMotor *motor)
 {
     // if no sensor linked return previous value ( for open loop )
     if (!motor->sensor)
         return motor->shaft_velocity;
-    return motor->sensor_direction * FIX_TO_FLOAT(LowPassFilter_update(&motor->LPF_velocity, motor->sensor->getVelocity(motor->sensor)));
+    return motor->sensor_direction * LowPassFilter_update(&motor->LPF_velocity, motor->sensor->getVelocity(motor->sensor));
 }
 
-static float default_electricalAngle(FOCMotor *motor)
+static FIXP default_electricalAngle(FOCMotor *motor)
 {
     // if no sensor linked return previous value ( for open loop )
     if (!motor->sensor)
         return motor->electrical_angle;
-    return _normalizeAngle((float)(motor->sensor_direction * motor->pole_pairs) * FIX_TO_FLOAT(motor->sensor->getMechanicalAngle(motor->sensor)) - motor->zero_electric_angle);
+    return fix_normalize_angle((motor->sensor_direction * motor->pole_pairs) * motor->sensor->getMechanicalAngle(motor->sensor) - motor->zero_electric_angle);
 }
 
 /**
@@ -93,224 +94,223 @@ static void default_useMonitoring(FOCMotor *motor, Print *print)
 }
 
 // Measure resistance and inductance of a motor
-static int default_characteriseMotor(FOCMotor *motor, float voltage, float correction_factor)
+static int default_characteriseMotor(FOCMotor *motor, FIXP voltage, FIXP correction_factor)
 {
-    if (!motor->current_sense || !motor->current_sense->initialized)
-    {
-        TinyFOC_MOTOR_ERROR("Fail. CS not init.");
-        return 1;
-    }
+    // TODO
 
-    if (voltage <= 0.0f)
-    {
-        TinyFOC_MOTOR_ERROR("Fail. Volt. <= 0");
-        return 2;
-    }
-    voltage = _constrain(voltage, 0.0f, motor->voltage_limit);
+    // if (!motor->current_sense || !motor->current_sense->initialized)
+    // {
+    //     TinyFOC_MOTOR_ERROR("Fail. CS not init.");
+    //     return 1;
+    // }
 
-    TinyFOC_MOTOR_DEBUG("Meas R..");
+    // if (voltage <= 0)
+    // {
+    //     TinyFOC_MOTOR_ERROR("Fail. Volt. <= 0");
+    //     return 2;
+    // }
+    // voltage = _constrain(voltage, 0, motor->voltage_limit);
 
-    float current_electric_angle = motor->electricalAngle(motor);
+    // TinyFOC_MOTOR_DEBUG("Meas R..");
 
-    // Apply zero volts and measure a zero reference
-    motor->setPhaseVoltage(motor, 0, 0, current_electric_angle);
-    _delay(500);
+    // FIXP current_electric_angle = motor->electricalAngle(motor);
 
-    PhaseCurrent_s zerocurrent_raw = CurrentSense_readAverageCurrents(motor->current_sense, CURRENT_SENSE_N);
-    DQCurrent_s zerocurrent = CurrentSense_getDQCurrents(motor->current_sense, CurrentSense_getABCurrents(motor->current_sense, zerocurrent_raw), current_electric_angle);
+    // // Apply zero volts and measure a zero reference
+    // motor->setPhaseVoltage(motor, 0, 0, current_electric_angle);
+    // _delay(500);
 
-    // Ramp and hold the voltage to measure resistance
-    // 300 ms of ramping
-    current_electric_angle = motor->electricalAngle(motor);
-    for (int i = 0; i < 100; i++)
-    {
-        motor->setPhaseVoltage(motor, 0, voltage / 100 * ((float)i), current_electric_angle);
-        _delay(3);
-    }
-    _delay(10);
-    // PhaseCurrent_s r_currents_raw = CurrentSense_readAverageCurrents(motor->current_sense, CURRENT_SENSE_N);
-    DQCurrent_s r_currents = CurrentSense_getDQCurrents(motor->current_sense, CurrentSense_getABCurrents(motor->current_sense, zerocurrent_raw), current_electric_angle);
+    // PhaseCurrent_s zerocurrent_raw = CurrentSense_readAverageCurrents(motor->current_sense, CURRENT_SENSE_N);
+    // DQCurrent_s zerocurrent = CurrentSense_getDQCurrents(motor->current_sense, CurrentSense_getABCurrents(motor->current_sense, zerocurrent_raw), current_electric_angle);
 
-    // Zero again
-    motor->setPhaseVoltage(motor, 0, 0, current_electric_angle);
+    // // Ramp and hold the voltage to measure resistance
+    // // 300 ms of ramping
+    // current_electric_angle = motor->electricalAngle(motor);
+    // for (int i = 0; i < 100; i++)
+    // {
+    //     motor->setPhaseVoltage(motor, 0, FIX_MUL_DIV_INT(voltage, i, 100), current_electric_angle);
+    //     _delay(3);
+    // }
+    // _delay(10);
+    // // PhaseCurrent_s r_currents_raw = CurrentSense_readAverageCurrents(motor->current_sense, CURRENT_SENSE_N);
+    // DQCurrent_s r_currents = CurrentSense_getDQCurrents(motor->current_sense, CurrentSense_getABCurrents(motor->current_sense, zerocurrent_raw), current_electric_angle);
 
-    if (_abs(r_currents.d - zerocurrent.d) < 0.2f)
-    {
-        TinyFOC_MOTOR_ERROR("Fail. current too low");
-        return 3;
-    }
+    // // Zero again
+    // motor->setPhaseVoltage(motor, 0, 0, current_electric_angle);
 
-    float resistance = voltage / (correction_factor * (r_currents.d - zerocurrent.d));
-    if (resistance <= 0.0f)
-    {
-        TinyFOC_MOTOR_ERROR("Fail. Est. R<= 0");
-        return 4;
-    }
+    // if (_abs(r_currents.d - zerocurrent.d) < 0.2f)
+    // {
+    //     TinyFOC_MOTOR_ERROR("Fail. current too low");
+    //     return 3;
+    // }
 
-    TinyFOC_MOTOR_DEBUG("Est. R: ", 2.0f * resistance);
-    _delay(100);
+    // FIXP resistance = FIX_DIV(voltage, FIX_MUL(correction_factor, (r_currents.d - zerocurrent.d)));
+    // if (resistance <= 0)
+    // {
+    //     TinyFOC_MOTOR_ERROR("Fail. Est. R<= 0");
+    //     return 4;
+    // }
 
-    // Start inductance measurement
-    TinyFOC_MOTOR_DEBUG("Meas L...");
+    // TinyFOC_MOTOR_DEBUG("Est. R: ", 2.0f * FIX_TO_FLOAT(resistance));
+    // _delay(100);
 
-    uint32_t t0 = 0;
-    uint32_t t1 = 0;
-    float Ltemp = 0;
-    float Ld = 0;
-    float Lq = 0;
-    float d_electrical_angle = 0;
+    // // Start inductance measurement
+    // TinyFOC_MOTOR_DEBUG("Meas L...");
 
-    unsigned int iterations = 40;    // how often the algorithm gets repeated.
-    unsigned int cycles = 3;         // averaged measurements for each iteration
-    unsigned int risetime_us = 200;  // initially short for worst case scenario with low inductance
-    unsigned int settle_us = 100000; // initially long for worst case scenario with high inductance
+    // uint32_t t0 = 0;
+    // uint32_t t1 = 0;
+    // FIXP Ltemp = 0;
+    // FIXP Ld = 0;
+    // FIXP Lq = 0;
+    // FIXP d_electrical_angle = 0;
 
-    // Pre-rotate the angle to the q-axis (only useful with sensor, else no harm in doing it)
-    current_electric_angle += 0.5f * _PI;
-    current_electric_angle = _normalizeAngle(current_electric_angle);
+    // uint16_t iterations = 40;    // how often the algorithm gets repeated.
+    // uint16_t cycles = 3;         // averaged measurements for each iteration
+    // uint32_t risetime_us = 200;  // initially short for worst case scenario with low inductance
+    // uint32_t settle_us = 100000; // initially long for worst case scenario with high inductance
 
-    for (size_t axis = 0; axis < 2; axis++)
-    {
-        for (size_t i = 0; i < iterations; i++)
-        {
-            // current_electric_angle = i * _2PI / iterations; // <-- Do a sweep of the inductance. Use eg. for graphing
-            float inductanced = 0.0f;
+    // // Pre-rotate the angle to the q-axis (only useful with sensor, else no harm in doing it)
+    // current_electric_angle += 0.5f * _PI;
+    // current_electric_angle = _normalizeAngle(current_electric_angle);
 
-            float qcurrent = 0.0f;
-            float dcurrent = 0.0f;
-            for (size_t j = 0; j < cycles; j++)
-            {
-                // read zero current
-                zerocurrent_raw = CurrentSense_readAverageCurrents(motor->current_sense, 20);
-                zerocurrent = CurrentSense_getDQCurrents(motor->current_sense, CurrentSense_getABCurrents(motor->current_sense, zerocurrent_raw), current_electric_angle);
+    // for (size_t axis = 0; axis < 2; axis++)
+    // {
+    //     for (size_t i = 0; i < iterations; i++)
+    //     {
+    //         // current_electric_angle = i * _2PI / iterations; // <-- Do a sweep of the inductance. Use eg. for graphing
+    //         FIXP inductanced = 0;
 
-                // step the voltage
-                motor->setPhaseVoltage(motor, 0, voltage, current_electric_angle);
-                t0 = _micros();
-                _delay_us(risetime_us); // wait a little bit
+    //         FIXP qcurrent = 0;
+    //         FIXP dcurrent = 0;
+    //         for (size_t j = 0; j < cycles; j++)
+    //         {
+    //             // read zero current
+    //             zerocurrent_raw = CurrentSense_readAverageCurrents(motor->current_sense, 20);
+    //             zerocurrent = CurrentSense_getDQCurrents(motor->current_sense, CurrentSense_getABCurrents(motor->current_sense, zerocurrent_raw), current_electric_angle);
 
-                PhaseCurrent_s l_currents_raw = motor->current_sense->getPhaseCurrents(motor->current_sense);
-                t1 = _micros();
-                motor->setPhaseVoltage(motor, 0, 0, current_electric_angle);
+    //             // step the voltage
+    //             motor->setPhaseVoltage(motor, 0, voltage, current_electric_angle);
+    //             t0 = _micros();
+    //             _delay_us(risetime_us); // wait a little bit
 
-                DQCurrent_s l_currents = CurrentSense_getDQCurrents(motor->current_sense, CurrentSense_getABCurrents(motor->current_sense, l_currents_raw), current_electric_angle);
-                _delay_us(settle_us); // wait a bit for the currents to go to 0 again
+    //             PhaseCurrent_s l_currents_raw = motor->current_sense->getPhaseCurrents(motor->current_sense);
+    //             t1 = _micros();
+    //             motor->setPhaseVoltage(motor, 0, 0, current_electric_angle);
 
-                if (t0 > t1)
-                    continue; // safety first
+    //             DQCurrent_s l_currents = CurrentSense_getDQCurrents(motor->current_sense, CurrentSense_getABCurrents(motor->current_sense, l_currents_raw), current_electric_angle);
+    //             _delay_us(settle_us); // wait a bit for the currents to go to 0 again
 
-                // calculate the inductance
-                float dt = (t1 - t0) / 1000000.0f;
-                if (l_currents.d - zerocurrent.d <= 0 || (voltage - resistance * (l_currents.d - zerocurrent.d)) <= 0)
-                {
-                    continue;
-                }
+    //             // calculate the inductance
+    //             uint32_t dt = (t1 - t0);
+    //             if (l_currents.d - zerocurrent.d <= 0 || (voltage - FIX_MUL(resistance, (l_currents.d - zerocurrent.d))) <= 0)
+    //             {
+    //                 continue;
+    //             }
 
-                inductanced += _abs(-(resistance * dt) / _log((voltage - resistance * (l_currents.d - zerocurrent.d)) / voltage)) / correction_factor;
+    //             inductanced += _abs(-(resistance * dt) / fix_log((voltage - resistance * (l_currents.d - zerocurrent.d)) / voltage)) / correction_factor;
 
-                qcurrent += l_currents.q - zerocurrent.q; // average the measured currents
-                dcurrent += l_currents.d - zerocurrent.d;
-            }
-            qcurrent /= cycles;
-            dcurrent /= cycles;
+    //             qcurrent += l_currents.q - zerocurrent.q; // average the measured currents
+    //             dcurrent += l_currents.d - zerocurrent.d;
+    //         }
+    //         qcurrent /= cycles;
+    //         dcurrent /= cycles;
 
-            float delta = qcurrent / (_abs(dcurrent) + _abs(qcurrent));
+    //         float delta = qcurrent / (_abs(dcurrent) + _abs(qcurrent));
 
-            inductanced /= cycles;
-            Ltemp = i < 2 ? inductanced : Ltemp * 0.6 + inductanced * 0.4;
+    //         inductanced /= cycles;
+    //         Ltemp = i < 2 ? inductanced : Ltemp * 0.6 + inductanced * 0.4;
 
-            float timeconstant = _abs(Ltemp / resistance); // Timeconstant of an RL circuit (L/R)
-            // TinyFOC_MOTOR_DEBUG("Estimated time constant in us: ", 1000000.0f * timeconstant);
+    //         float timeconstant = _abs(Ltemp / resistance); // Timeconstant of an RL circuit (L/R)
+    //         // TinyFOC_MOTOR_DEBUG("Estimated time constant in us: ", us_per_s.0f * timeconstant);
 
-            // Wait as long as possible (due to limited timing accuracy & sample rate), but as short as needed (while the current still changes)
-            risetime_us = _constrain(risetime_us * 0.6f + 0.4f * 1000000 * 0.6f * timeconstant, 100, 10000);
-            settle_us = 10 * risetime_us;
+    //         // Wait as long as possible (due to limited timing accuracy & sample rate), but as short as needed (while the current still changes)
+    //         risetime_us = _constrain(risetime_us * 0.6f + 0.4f * us_per_s * 0.6f * timeconstant, 100, 10000);
+    //         settle_us = 10 * risetime_us;
 
-            // Serial.printf(">inductance:%f:%f|xy\n", current_electric_angle, Ltemp * 1000.0f); // <-- Plot an angle sweep
+    //         // Serial.printf(">inductance:%f:%f|xy\n", current_electric_angle, Ltemp * 1000.0f); // <-- Plot an angle sweep
 
-            /**
-             * How this code works:
-             * If we apply a current spike in the d´-axis, there will be cross coupling to the q´-axis current, if we didn´t use the actual d-axis (ie. d´ != d).
-             * This has to do with saliency (Ld != Lq).
-             * The amount of cross coupled current is somewhat proportional to the angle error, which means that if we iteratively change the angle to min/maximise this current, we get the correct d-axis (and q-axis).
-             */
-            if (axis)
-            {
-                qcurrent *= -1.0f; // to d or q axis
-            }
+    //         /**
+    //          * How this code works:
+    //          * If we apply a current spike in the d´-axis, there will be cross coupling to the q´-axis current, if we didn´t use the actual d-axis (ie. d´ != d).
+    //          * This has to do with saliency (Ld != Lq).
+    //          * The amount of cross coupled current is somewhat proportional to the angle error, which means that if we iteratively change the angle to min/maximise this current, we get the correct d-axis (and q-axis).
+    //          */
+    //         if (axis)
+    //         {
+    //             qcurrent *= -1.0f; // to d or q axis
+    //         }
 
-            if (qcurrent < 0)
-            {
-                current_electric_angle += _abs(delta);
-            }
-            else
-            {
-                current_electric_angle -= _abs(delta);
-            }
-            current_electric_angle = _normalizeAngle(current_electric_angle);
+    //         if (qcurrent < 0)
+    //         {
+    //             current_electric_angle += _abs(delta);
+    //         }
+    //         else
+    //         {
+    //             current_electric_angle -= _abs(delta);
+    //         }
+    //         current_electric_angle = _normalizeAngle(current_electric_angle);
 
-            // Average the d-axis angle further for calculating the electrical zero later
-            if (axis)
-            {
-                d_electrical_angle = i < 2 ? current_electric_angle : d_electrical_angle * 0.9 + current_electric_angle * 0.1;
-            }
-        }
+    //         // Average the d-axis angle further for calculating the electrical zero later
+    //         if (axis)
+    //         {
+    //             d_electrical_angle = i < 2 ? current_electric_angle : d_electrical_angle * 0.9 + current_electric_angle * 0.1;
+    //         }
+    //     }
 
-        // We know the minimum is 0.5*PI radians away, so less iterations are needed.
-        current_electric_angle += 0.5f * _PI;
-        current_electric_angle = _normalizeAngle(current_electric_angle);
-        iterations /= 2;
+    //     // We know the minimum is 0.5*PI radians away, so less iterations are needed.
+    //     current_electric_angle += 0.5f * _PI;
+    //     current_electric_angle = _normalizeAngle(current_electric_angle);
+    //     iterations /= 2;
 
-        if (axis == 0)
-        {
-            Lq = Ltemp;
-        }
-        else
-        {
-            Ld = Ltemp;
-        }
-    }
+    //     if (axis == 0)
+    //     {
+    //         Lq = Ltemp;
+    //     }
+    //     else
+    //     {
+    //         Ld = Ltemp;
+    //     }
+    // }
 
-    if (motor->sensor)
-    {
-        /**
-         * The d_electrical_angle should now be aligned to the d axis or the -d axis. We can therefore calculate two possible electrical zero angles.
-         * We then report the one closest to the actual value. This could be useful if the zero search method is not reliable enough (eg. high pole count).
-         */
+    // if (motor->sensor)
+    // {
+    //     /**
+    //      * The d_electrical_angle should now be aligned to the d axis or the -d axis. We can therefore calculate two possible electrical zero angles.
+    //      * We then report the one closest to the actual value. This could be useful if the zero search method is not reliable enough (eg. high pole count).
+    //      */
 
-        float estimated_zero_electric_angle_A = _normalizeAngle((float)(motor->sensor_direction * motor->pole_pairs) * FIX_TO_FLOAT(motor->sensor->getMechanicalAngle(motor->sensor)) - d_electrical_angle);
-        float estimated_zero_electric_angle_B = _normalizeAngle((float)(motor->sensor_direction * motor->pole_pairs) * FIX_TO_FLOAT(motor->sensor->getMechanicalAngle(motor->sensor)) - d_electrical_angle + _PI);
-        float estimated_zero_electric_angle = 0.0f;
-        if (_abs(estimated_zero_electric_angle_A - motor->zero_electric_angle) < _abs(estimated_zero_electric_angle_B - motor->zero_electric_angle))
-        {
-            estimated_zero_electric_angle = estimated_zero_electric_angle_A;
-        }
-        else
-        {
-            estimated_zero_electric_angle = estimated_zero_electric_angle_B;
-        }
+    //     float estimated_zero_electric_angle_A = _normalizeAngle((float)(motor->sensor_direction * motor->pole_pairs) * FIX_TO_FLOAT(motor->sensor->getMechanicalAngle(motor->sensor)) - d_electrical_angle);
+    //     float estimated_zero_electric_angle_B = _normalizeAngle((float)(motor->sensor_direction * motor->pole_pairs) * FIX_TO_FLOAT(motor->sensor->getMechanicalAngle(motor->sensor)) - d_electrical_angle + _PI);
+    //     float estimated_zero_electric_angle = 0.0f;
+    //     if (_abs(estimated_zero_electric_angle_A - motor->zero_electric_angle) < _abs(estimated_zero_electric_angle_B - motor->zero_electric_angle))
+    //     {
+    //         estimated_zero_electric_angle = estimated_zero_electric_angle_A;
+    //     }
+    //     else
+    //     {
+    //         estimated_zero_electric_angle = estimated_zero_electric_angle_B;
+    //     }
 
-        TinyFOC_MOTOR_DEBUG("New el. zero: ", estimated_zero_electric_angle);
-        TinyFOC_MOTOR_DEBUG("Curr. el. zero: ", motor->zero_electric_angle);
-    }
+    //     TinyFOC_MOTOR_DEBUG("New el. zero: ", estimated_zero_electric_angle);
+    //     TinyFOC_MOTOR_DEBUG("Curr. el. zero: ", motor->zero_electric_angle);
+    // }
 
-    TinyFOC_MOTOR_DEBUG("Ld [mH]: ", Ld * 1000.0f);
-    TinyFOC_MOTOR_DEBUG("Lq [mH]: ", Lq * 1000.0f);
-    if (Ld > Lq)
-    {
-        TinyFOC_MOTOR_WARN("Ld>Lq. Likely error.");
-    }
-    if (Ld * 2.0f < Lq)
-    {
-        TinyFOC_MOTOR_WARN("Lq > 2*Ld. Likely error.");
-    }
+    // TinyFOC_MOTOR_DEBUG("Ld [mH]: ", Ld * 1000.0f);
+    // TinyFOC_MOTOR_DEBUG("Lq [mH]: ", Lq * 1000.0f);
+    // if (Ld > Lq)
+    // {
+    //     TinyFOC_MOTOR_WARN("Ld>Lq. Likely error.");
+    // }
+    // if (Ld * 2.0f < Lq)
+    // {
+    //     TinyFOC_MOTOR_WARN("Lq > 2*Ld. Likely error.");
+    // }
 
-    // store the measured values
-    motor->phase_resistance = 2.0f * resistance;
-    motor->axis_inductance.d = Ld;
-    motor->axis_inductance.q = Lq;
-    motor->phase_inductance = (Ld + Lq) / 2.0f; // FOR BACKWARDS COMPATIBILITY
-    return 0;
+    // // store the measured values
+    // motor->phase_resistance = 2.0f * resistance;
+    // motor->axis_inductance.d = Ld;
+    // motor->axis_inductance.q = Lq;
+    // motor->phase_inductance = (Ld + Lq) / 2.0f; // FOR BACKWARDS COMPATIBILITY
+    // return 0;
 }
 
 // utility function intended to be used with serial plotter to monitor motor variables
@@ -357,8 +357,8 @@ static void default_monitor(FOCMotor *motor)
         {
 
             c = CurrentSense_getFOCCurrents(motor->current_sense, motor->electrical_angle);
-            c.q = FIX_TO_FLOAT(LowPassFilter_update(&(motor->LPF_current_q), FIX_FROM_FLOAT(c.q)));;
-            c.d = FIX_TO_FLOAT(LowPassFilter_update(&(motor->LPF_current_d), FIX_FROM_FLOAT(c.d)));
+            c.q = LowPassFilter_update(&(motor->LPF_current_q), c.q);
+            c.d = LowPassFilter_update(&(motor->LPF_current_d), c.d);
         }
         if (motor->monitor_variables & _MON_CURR_Q)
         {
@@ -413,18 +413,19 @@ static void default_monitor(FOCMotor *motor)
 // Function (iterative) generating open loop movement for target velocity
 // - target_velocity - rad/s
 // it uses voltage_limit variable
-float FOCMotor_velocityOpenloop(FOCMotor *motor, float target_velocity)
+// this is shit, this is closed loop but with a weird P controller
+FIXP FOCMotor_velocityOpenloop(FOCMotor *motor, FIXP target_velocity)
 {
     // get current timestamp
     uint32_t now_us = _micros();
     // calculate the sample time from last call
-    float Ts = (now_us - motor->open_loop_timestamp) * 1e-6f;
+    uint32_t Ts = now_us - motor->open_loop_timestamp;
     // quick fix for strange cases (micros overflow + timestamp not defined)
-    if (Ts <= 0 || Ts > 0.5f)
-        Ts = 1e-3f;
+    if (Ts > 500000)
+        Ts = 1000;
 
     // calculate the necessary angle to achieve target velocity
-    motor->shaft_angle = _normalizeAngle(motor->shaft_angle + target_velocity * Ts);
+    motor->shaft_angle = fix_normalize_angle(motor->shaft_angle + FIX_MUL_DIV_INT(target_velocity, Ts, us_per_s));
     // for display purposes
     motor->shaft_velocity = target_velocity;
 
@@ -440,24 +441,25 @@ float FOCMotor_velocityOpenloop(FOCMotor *motor, float target_velocity)
 // Function (iterative) generating open loop movement towards the target angle
 // - target_angle - rad
 // it uses voltage_limit and velocity_limit variables
-float FOCMotor_angleOpenloop(FOCMotor *motor, float target_angle)
+// this is shit, it uses a weird bang bang control
+FIXP FOCMotor_angleOpenloop(FOCMotor *motor, FIXP target_angle)
 {
     // get current timestamp
     uint32_t now_us = _micros();
     // calculate the sample time from last call
-    float Ts = (now_us - motor->open_loop_timestamp) * 1e-6f;
+    uint32_t Ts = now_us - motor->open_loop_timestamp;
     // quick fix for strange cases (micros overflow + timestamp not defined)
-    if (Ts <= 0 || Ts > 0.5f)
-        Ts = 1e-3f;
+    if (Ts > 500000)
+        Ts = 1000;
 
     // calculate the necessary angle to move from current position towards target angle
     // with maximal velocity (velocity_limit)
     // TODO sensor precision: this calculation is not numerically precise. The angle can grow to the point
     //                        where small position changes are no longer captured by the precision of floats
     //                        when the total position is large.
-    if (_abs(target_angle - motor->shaft_angle) > _abs(motor->velocity_limit * Ts))
+    if (_abs(target_angle - motor->shaft_angle) > FIX_MUL_DIV_INT(_abs(motor->velocity_limit), Ts, us_per_s))
     {
-        motor->shaft_angle += _sign(target_angle - motor->shaft_angle) * _abs(motor->velocity_limit) * Ts;
+        motor->shaft_angle += _sign(target_angle - motor->shaft_angle) * FIX_MUL_DIV_INT(_abs(motor->velocity_limit), Ts, us_per_s);
         motor->shaft_velocity = motor->velocity_limit;
     }
     else
@@ -477,41 +479,41 @@ float FOCMotor_angleOpenloop(FOCMotor *motor, float target_angle)
 }
 
 // Update limit values in controllers when changed
-void FOCMotor_updateVelocityLimit(FOCMotor *motor, float new_velocity_limit)
+void FOCMotor_updateVelocityLimit(FOCMotor *motor, FIXP new_velocity_limit)
 {
     motor->velocity_limit = new_velocity_limit;
     if (motor->controller != MotionControlType_angle_nocascade)
-        motor->P_angle.limit = FIX_FROM_FLOAT(_abs(motor->velocity_limit)); // if angle control but no velocity cascade, limit the angle controller by the velocity limit
+        motor->P_angle.limit = _abs(motor->velocity_limit); // if angle control but no velocity cascade, limit the angle controller by the velocity limit
 }
 
 // Update limit values in controllers when changed
-void FOCMotor_updateCurrentLimit(FOCMotor *motor, float new_current_limit)
+void FOCMotor_updateCurrentLimit(FOCMotor *motor, FIXP new_current_limit)
 {
     motor->current_limit = new_current_limit;
     if (motor->torque_controller != TorqueControlType_voltage)
     {
         // if current control
-        motor->PID_velocity.limit = FIX_FROM_FLOAT(new_current_limit);
+        motor->PID_velocity.limit = new_current_limit;
         if (motor->controller == MotionControlType_angle_nocascade)
             // if angle control but no velocity cascade, limit the angle controller by the current limit
-            motor->P_angle.limit = FIX_FROM_FLOAT(new_current_limit);
+            motor->P_angle.limit = new_current_limit;
     }
 }
 
 // Update limit values in controllers when changed
 // PID values and limits
-void FOCMotor_updateVoltageLimit(FOCMotor *motor, float new_voltage_limit)
+void FOCMotor_updateVoltageLimit(FOCMotor *motor, FIXP new_voltage_limit)
 {
     motor->voltage_limit = new_voltage_limit;
-    motor->PID_current_q.limit = FIX_FROM_FLOAT(new_voltage_limit);
-    motor->PID_current_d.limit = FIX_FROM_FLOAT(new_voltage_limit);
+    motor->PID_current_q.limit = new_voltage_limit;
+    motor->PID_current_d.limit = new_voltage_limit;
     if (motor->torque_controller == TorqueControlType_voltage)
     {
         // if voltage control
-        motor->PID_velocity.limit = FIX_FROM_FLOAT(new_voltage_limit);
+        motor->PID_velocity.limit = new_voltage_limit;
         if (motor->controller == MotionControlType_angle_nocascade)
             // if angle control but no velocity cascade, limit the angle controller by the voltage limit
-            motor->P_angle.limit = FIX_FROM_FLOAT(new_voltage_limit);
+            motor->P_angle.limit = new_voltage_limit;
     }
 }
 
@@ -581,25 +583,25 @@ void FOCMotor_updateMotionControlType(FOCMotor *motor, enum MotionControlType ne
     FOCMotor_updateVoltageLimit(motor, motor->voltage_limit);
 }
 
-int FOCMotor_tuneCurrentController(FOCMotor *motor, float bandwidth)
+int FOCMotor_tuneCurrentController(FOCMotor *motor, FIXP bandwidth)
 {
-    if (bandwidth <= 0.0f)
+    if (bandwidth <= 0)
     {
         // check bandwidth is positive
         TinyFOC_MOTOR_ERROR("Fail. BW <= 0");
         return 1;
     }
-    if (motor->loopfoc_time_us && bandwidth > 0.5f * (1e6f / motor->loopfoc_time_us))
+    if (motor->loopfoc_time_us && bandwidth > FIX_MUL_DIV_INT(FIX_FROM_FLOAT(0.5f), us_per_s, motor->loopfoc_time_us))
     {
         // check bandwidth is not too high for the control loop frequency
-        TinyFOC_MOTOR_ERROR("Fail. BW too high, current loop freq:", (1e6f / motor->loopfoc_time_us));
+        TinyFOC_MOTOR_ERROR("Fail. BW too high, current loop freq:", FIX_MUL_DIV_INT(FIX_ONE, us_per_s, motor->loopfoc_time_us));
         return 2;
     }
     if (!_isset(motor->phase_resistance) || (!_isset(motor->phase_inductance) && !_isset(motor->axis_inductance.q)))
     {
         // need motor parameters to tune the controller
         TinyFOC_MOTOR_WARN("Motor params missing!");
-        if (motor->characteriseMotor(motor, motor->voltage_sensor_align, 1.5))
+        if (motor->characteriseMotor(motor, motor->voltage_sensor_align, FIX_FROM_FLOAT(1.5f)))
         {
             return 3;
         }
@@ -611,12 +613,12 @@ int FOCMotor_tuneCurrentController(FOCMotor *motor, float bandwidth)
         motor->axis_inductance.q = motor->phase_inductance;
     }
 
-    motor->PID_current_q.P = motor->axis_inductance.q * (_2PI * bandwidth);
-    motor->PID_current_q.I = motor->phase_resistance * (_2PI * bandwidth);
-    motor->PID_current_d.P = motor->axis_inductance.d * (_2PI * bandwidth);
-    motor->PID_current_d.I = motor->phase_resistance * (_2PI * bandwidth);
-    motor->LPF_current_d.Tf = 1.0f / (_2PI * bandwidth * 5.0f); // filter cutoff at 5x bandwidth
-    motor->LPF_current_q.Tf = 1.0f / (_2PI * bandwidth * 5.0f); // filter cutoff at 5x bandwidth
+    motor->PID_current_q.P = FIX_MUL(motor->axis_inductance.q, FIX_MUL(FIX_2PI, bandwidth));
+    motor->PID_current_q.I = FIX_MUL(motor->phase_resistance, FIX_MUL(FIX_2PI, bandwidth));
+    motor->PID_current_d.P = FIX_MUL(motor->axis_inductance.d, FIX_MUL(FIX_2PI, bandwidth));
+    motor->PID_current_d.I = FIX_MUL(motor->phase_resistance, FIX_MUL(FIX_2PI, bandwidth));
+    motor->LPF_current_d.Tf = FIX_DIV(us_per_s, FIX_MUL(FIX_2PI, FIX_MUL(bandwidth, FIX_FROM_FLOAT(5.0f)))); // filter cutoff at 5x bandwidth
+    motor->LPF_current_q.Tf = FIX_DIV(us_per_s, FIX_MUL(FIX_2PI, FIX_MUL(bandwidth, FIX_FROM_FLOAT(5.0f)))); // filter cutoff at 5x bandwidth
 
     TinyFOC_MOTOR_DEBUG("Tuned PI params for BW [Hz]: ", bandwidth);
     TinyFOC_MOTOR_DEBUG("Pq: ", motor->PID_current_q.P);
@@ -633,7 +635,7 @@ static void default_loopFOC(FOCMotor *motor)
 {
     if (motor->motion_cnt++ > motor->motion_downsample)
         motor->move(motor, NOT_SET);
-    
+
     // update loop time measurement
     updateLoopFOCTime(motor);
 
@@ -653,7 +655,7 @@ static void default_loopFOC(FOCMotor *motor)
     // if open-loop do nothing
     if (motor->controller == MotionControlType_angle_openloop || motor->controller == MotionControlType_velocity_openloop)
         // calculate the open loop electirical angle
-        motor->electrical_angle = _electricalAngle((motor->shaft_angle), motor->pole_pairs);
+        motor->electrical_angle = (motor->shaft_angle * motor->pole_pairs);
     else
         // Needs the update() to be called first
         // This function will not have numerical issues because it uses Sensor::getMechanicalAngle()
@@ -675,7 +677,7 @@ static void default_loopFOC(FOCMotor *motor)
         if (_isset(motor->KV_rating))
             motor->voltage_bemf = motor->estimateBEMF(motor, motor->shaft_velocity);
         // filter the value values
-        motor->current.q = FIX_TO_FLOAT(LowPassFilter_update(&(motor->LPF_current_q), FIX_FROM_FLOAT(motor->current_sp)));
+        motor->current.q = LowPassFilter_update(&(motor->LPF_current_q), motor->current_sp);
         // calculate the phase voltage
         motor->voltage.q = motor->current.q * motor->phase_resistance + motor->voltage_bemf;
         // constrain voltage within limits
@@ -694,12 +696,12 @@ static void default_loopFOC(FOCMotor *motor)
         // read overall current magnitude
         motor->current.q = motor->current_sense->getDCCurrent(motor->current_sense, motor->electrical_angle);
         // filter the value values
-        motor->current.q = FIX_TO_FLOAT(LowPassFilter_update(&(motor->LPF_current_q), FIX_FROM_FLOAT(motor->current.q)));
+        motor->current.q = LowPassFilter_update(&(motor->LPF_current_q), motor->current.q);
         // calculate the phase voltage
-        motor->voltage.q = FIX_TO_FLOAT(PIDController_update(&(motor->PID_current_q), FIX_FROM_FLOAT(motor->current_sp - motor->current.q))) + motor->feed_forward_voltage.q;
+        motor->voltage.q = PIDController_update(&(motor->PID_current_q), motor->current_sp - motor->current.q) + motor->feed_forward_voltage.q;
         // d voltage  - lag compensation
         if (_isset(motor->axis_inductance.q))
-            motor->voltage.d = _constrain(-motor->current_sp * motor->shaft_velocity * motor->pole_pairs * motor->axis_inductance.q, -motor->voltage_limit, motor->voltage_limit) + motor->feed_forward_voltage.d;
+            motor->voltage.d = _constrain(-FIX_MUL(FIX_MUL(motor->current_sp, motor->shaft_velocity * motor->pole_pairs), motor->axis_inductance.q), -motor->voltage_limit, motor->voltage_limit) + motor->feed_forward_voltage.d;
         else
             motor->voltage.d = motor->feed_forward_voltage.d;
         break;
@@ -711,17 +713,17 @@ static void default_loopFOC(FOCMotor *motor)
         // read dq currents
         motor->current = CurrentSense_getFOCCurrents(motor->current_sense, motor->electrical_angle);
         // filter values
-        motor->current.q = FIX_TO_FLOAT(LowPassFilter_update(&(motor->LPF_current_q), FIX_FROM_FLOAT(motor->current.q)));
-        motor->current.d = FIX_TO_FLOAT(LowPassFilter_update(&(motor->LPF_current_d), FIX_FROM_FLOAT(motor->current.d)));
+        motor->current.q = LowPassFilter_update(&(motor->LPF_current_q), motor->current.q);
+        motor->current.d = LowPassFilter_update(&(motor->LPF_current_d), motor->current.d);
         // calculate the phase voltages
-        motor->voltage.q = FIX_TO_FLOAT(PIDController_update(&(motor->PID_current_q), FIX_FROM_FLOAT(motor->current_sp - motor->current.q)));
-        motor->voltage.d = FIX_TO_FLOAT(PIDController_update(&(motor->PID_current_d), FIX_FROM_FLOAT(motor->feed_forward_current.d - motor->current.d)));
+        motor->voltage.q = PIDController_update(&(motor->PID_current_q), motor->current_sp - motor->current.q);
+        motor->voltage.d = PIDController_update(&(motor->PID_current_d), motor->feed_forward_current.d - motor->current.d);
         // d voltage - lag compensation
         if (_isset(motor->axis_inductance.q))
-            motor->voltage.d = _constrain(motor->voltage.d - motor->current_sp * motor->shaft_velocity * motor->pole_pairs * motor->axis_inductance.q, -motor->voltage_limit, motor->voltage_limit);
+            motor->voltage.d = _constrain(motor->voltage.d - FIX_MUL(FIX_MUL(motor->current_sp, motor->shaft_velocity * motor->pole_pairs), motor->axis_inductance.q), -motor->voltage_limit, motor->voltage_limit);
         // q voltage - cross coupling compensation - TODO verify
         if (_isset(motor->axis_inductance.d))
-            motor->voltage.q = _constrain(motor->voltage.q + motor->current.d * motor->shaft_velocity * motor->pole_pairs * motor->axis_inductance.d, -motor->voltage_limit, motor->voltage_limit);
+            motor->voltage.q = _constrain(motor->voltage.q + FIX_MUL(FIX_MUL(motor->current.d, motor->shaft_velocity * motor->pole_pairs), motor->axis_inductance.d), -motor->voltage_limit, motor->voltage_limit);
         // add feed forward
         motor->voltage.q += motor->feed_forward_voltage.q;
         motor->voltage.d += motor->feed_forward_voltage.d;
@@ -740,14 +742,13 @@ static void default_loopFOC(FOCMotor *motor)
 // It runs either angle, velocity or voltage loop
 // - needs to be called iteratively it is asynchronous function
 // - if target is not set it uses motor.target value
-static void default_move(FOCMotor *motor, float new_target)
+static void default_move(FOCMotor *motor, FIXP new_target)
 {
     motor->motion_cnt = 1;
 
     // set internal target variable
     if (_isset(new_target))
         motor->target = new_target;
-
 
     // if initFOC is being executed at the moment, do nothing
     if (motor->motor_status == FOCMotorStatus_calibrating)
@@ -793,7 +794,7 @@ static void default_move(FOCMotor *motor, float new_target)
         // angle set point
         motor->shaft_angle_sp = motor->target;
         // calculate the torque command - sensor precision: this calculation is ok, but based on bad value from previous calculation
-        motor->current_sp = FIX_TO_FLOAT(PIDController_update(&(motor->P_angle), FIX_FROM_FLOAT(motor->shaft_angle_sp) - LowPassFilter_update(&motor->LPF_angle, FIX_FROM_FLOAT(motor->shaft_angle))));
+        motor->current_sp = PIDController_update(&(motor->P_angle), motor->shaft_angle_sp - LowPassFilter_update(&motor->LPF_angle, motor->shaft_angle));
         break;
     case MotionControlType_angle:
         // TODO sensor precision: this calculation is not numerically precise. The target value cannot express precise positions when
@@ -802,16 +803,16 @@ static void default_move(FOCMotor *motor, float new_target)
         // angle set point
         motor->shaft_angle_sp = motor->target;
         // calculate velocity set point
-        motor->shaft_velocity_sp = motor->feed_forward_velocity + FIX_TO_FLOAT(PIDController_update(&(motor->P_angle), FIX_FROM_FLOAT(motor->shaft_angle_sp) - LowPassFilter_update(&motor->LPF_angle, FIX_FROM_FLOAT(motor->shaft_angle))));
+        motor->shaft_velocity_sp = motor->feed_forward_velocity + PIDController_update(&(motor->P_angle), motor->shaft_angle_sp - LowPassFilter_update(&motor->LPF_angle, motor->shaft_angle));
         motor->shaft_velocity_sp = _constrain(motor->shaft_velocity_sp, -motor->velocity_limit, motor->velocity_limit);
         // calculate the torque command - sensor precision: this calculation is ok, but based on bad value from previous calculation
-        motor->current_sp = FIX_TO_FLOAT(PIDController_update(&(motor->PID_velocity), FIX_FROM_FLOAT(motor->shaft_velocity_sp - motor->shaft_velocity)));
+        motor->current_sp = PIDController_update(&(motor->PID_velocity), motor->shaft_velocity_sp - motor->shaft_velocity);
         break;
     case MotionControlType_velocity:
         // velocity set point - sensor precision: this calculation is numerically precise.
         motor->shaft_velocity_sp = motor->target;
         // calculate the torque command
-        motor->current_sp = FIX_TO_FLOAT(PIDController_update(&(motor->PID_velocity), FIX_FROM_FLOAT(motor->shaft_velocity_sp - motor->shaft_velocity)));
+        motor->current_sp = PIDController_update(&(motor->PID_velocity), motor->shaft_velocity_sp - motor->shaft_velocity);
         break;
     case MotionControlType_velocity_openloop:
         // velocity control in open loop - sensor precision: this calculation is numerically precise.
@@ -937,6 +938,81 @@ int FOCMotor_alignCurrentSense(FOCMotor *motor)
     return exit_flag > 0;
 }
 
+#define STRATEGY_MAX_VEL 0
+#define STRATEGY_MIN_DIFF 1
+FIXP FOCMotor_findBestOffset(FOCMotor *motor, FIXP voltage_align, FIXP min_offs, FIXP max_offs, uint8_t strategy)
+{
+    uint32_t lastMicros = _micros();
+    uint32_t dt = 0;
+    FIXP best_vel = NOT_SET;
+    FIXP vel_tmp_fwd = 0;
+    FIXP vel_tmp_rev = 0;
+    FIXP best_offset = 0;
+    FIXP curr_angle;
+    for (size_t i = 0; i < 8; i++)
+    {
+        motor->setPhaseVoltage(motor, 0, 0, 0);
+        _delay(1000); // wait for stop
+        lastMicros = _micros();
+        dt = _micros() - lastMicros;
+        motor->zero_electric_angle = FIX_MUL_DIV_INT(max_offs - min_offs, i, 8) + min_offs;
+        while (dt < 2000000) // wait 2 seconds for the movement to stabilize and be visible on the sensor
+        {
+            dt = _micros() - lastMicros;
+            curr_angle = motor->electricalAngle(motor);
+            motor->setPhaseVoltage(motor, voltage_align, 0, curr_angle);
+            motor->sensor->update(motor->sensor);
+            _delay_us(500);
+        }
+
+        vel_tmp_fwd = motor->shaftVelocity(motor);
+
+        motor->setPhaseVoltage(motor, 0, 0, 0);
+        _delay(1000);
+        lastMicros = _micros();
+        dt = _micros() - lastMicros;
+        while (dt < 2000000) // wait 2 seconds for the movement to stabilize and be visible on the sensor
+        {
+            dt = _micros() - lastMicros;
+            curr_angle = motor->electricalAngle(motor);
+            motor->setPhaseVoltage(motor, -voltage_align, 0, curr_angle);
+            motor->sensor->update(motor->sensor);
+            _delay_us(500);
+        }
+
+        vel_tmp_rev = motor->shaftVelocity(motor);
+
+        FIXP cmpval = 0;
+        if(strategy == STRATEGY_MAX_VEL)
+        {
+            cmpval = vel_tmp_fwd - vel_tmp_rev;
+            if (cmpval > best_vel || !_isset(best_vel))
+            {
+                best_vel = cmpval;
+                best_offset = motor->zero_electric_angle;
+                TinyFOCDebug_println_f("VFWD", vel_tmp_fwd);
+                TinyFOCDebug_println_f("VREV", vel_tmp_rev);
+                TinyFOCDebug_println_i("Best index: ", i);
+            }
+        }            
+        else if(strategy == STRATEGY_MIN_DIFF)
+        {
+            cmpval = _abs(vel_tmp_fwd + vel_tmp_rev);
+            if (cmpval < best_vel || !_isset(best_vel))
+            {
+                best_vel = cmpval;
+                best_offset = motor->zero_electric_angle;
+                TinyFOCDebug_println_f("VFWD", vel_tmp_fwd);
+                TinyFOCDebug_println_f("VREV", vel_tmp_rev);
+                TinyFOCDebug_println_i("Best index: ", i);
+            }
+        }
+
+        
+    }
+    return best_offset;
+}
+
 // Encoder alignment to electrical 0 angle
 int FOCMotor_alignSensor(FOCMotor *motor)
 {
@@ -952,38 +1028,37 @@ int FOCMotor_alignSensor(FOCMotor *motor)
 
     // v2.3.3 fix for R_AVR_7_PCREL against symbol" bug for AVR boards
     // TODO figure out why this works
-    float voltage_align = motor->voltage_sensor_align;
+    FIXP voltage_align = motor->voltage_sensor_align;
 
     // if unknown natural direction
     if (motor->sensor_direction == Direction_UNKNOWN)
     {
-
         // find natural direction
         // move one electrical revolution forward
         for (int i = 0; i <= 500; i++)
         {
-            float angle = _3PI_2 + _2PI * i / 500.0f;
+            FIXP angle = FIX_PI_2 + FIX_MUL_DIV_INT(FIX_2PI, i, 500);
             motor->setPhaseVoltage(motor, voltage_align, 0, angle);
             motor->sensor->update(motor->sensor);
             _delay(2);
         }
         // take and angle in the middle
         motor->sensor->update(motor->sensor);
-        float mid_angle = FIX_TO_FLOAT(motor->sensor->getAngle(motor->sensor));
+        FIXP mid_angle = motor->sensor->getAngle(motor->sensor);
         // move one electrical revolution backwards
         for (int i = 500; i >= 0; i--)
         {
-            float angle = _3PI_2 + _2PI * i / 500.0f;
+            FIXP angle = FIX_PI_2 + FIX_MUL_DIV_INT(FIX_2PI, i, 500);
             motor->setPhaseVoltage(motor, voltage_align, 0, angle);
             motor->sensor->update(motor->sensor);
             _delay(2);
         }
         motor->sensor->update(motor->sensor);
-        float end_angle = FIX_TO_FLOAT(motor->sensor->getAngle(motor->sensor));
+        FIXP end_angle = motor->sensor->getAngle(motor->sensor);
         // setPhaseVoltage(0, 0, 0);
         _delay(200);
         // determine the direction the sensor moved
-        float moved = _abs(mid_angle - end_angle);
+        FIXP moved = _abs(mid_angle - end_angle);
         if (moved < MIN_ANGLE_DETECT_MOVEMENT)
         { // minimum angle to detect movement
             TinyFOC_MOTOR_ERROR("Failed to notice movement");
@@ -999,11 +1074,33 @@ int FOCMotor_alignSensor(FOCMotor *motor)
             TinyFOC_MOTOR_DEBUG("sensor dir: CW");
             motor->sensor_direction = Direction_CW;
         }
+
+        // zero electric angle not known
+        if (!_isset(motor->zero_electric_angle))
+        {
+            // we sweep the sensor offset from 0 to 2 Pi in 10 steps and check where speed is max and in the right direction
+
+            FIXP offset = FOCMotor_findBestOffset(motor, voltage_align, 0, FIX_2PI, STRATEGY_MAX_VEL);
+            offset = FOCMotor_findBestOffset(motor, voltage_align, offset - FIX_PI_8, offset + FIX_PI_8, STRATEGY_MIN_DIFF); // do a second sweep around the best value for better precision
+
+            motor->zero_electric_angle = offset;
+
+            _delay(20);
+            TinyFOC_MOTOR_DEBUG("Zero elec. angle: ", motor->zero_electric_angle);
+            // stop everything
+            motor->setPhaseVoltage(motor, 0, 0, 0);
+            _delay(200);
+        }
+        else
+        {
+            TinyFOC_MOTOR_DEBUG("Skip offset calib.");
+        }
+
         // check pole pair number
-        motor->pp_check_result = !(fabs(moved * motor->pole_pairs - _2PI) > 0.5f); // 0.5f is arbitrary number it can be lower or higher!
+        motor->pp_check_result = !(_abs(moved * motor->pole_pairs - FIX_2PI) > FIX_HALF); // 0.5f is arbitrary number it can be lower or higher!
         if (motor->pp_check_result == false)
         {
-            TinyFOC_MOTOR_WARN("PP check: fail - est. pp: ", _2PI / moved);
+            TinyFOC_MOTOR_WARN("PP check: fail - est. pp: ", FIX_DIV(FIX_2PI, moved));
         }
         else
         {
@@ -1011,30 +1108,10 @@ int FOCMotor_alignSensor(FOCMotor *motor)
         }
     }
     else
+    {
         TinyFOC_MOTOR_DEBUG("Skip dir calib.");
+    }
 
-    // zero electric angle not known
-    if (!_isset(motor->zero_electric_angle))
-    {
-        // align the electrical phases of the motor and sensor
-        // set angle -90(270 = 3PI/2) degrees
-        motor->setPhaseVoltage(motor, voltage_align, 0, _3PI_2);
-        _delay(700);
-        // read the sensor
-        motor->sensor->update(motor->sensor);
-        // get the current zero electric angle
-        motor->zero_electric_angle = 0;
-        motor->zero_electric_angle = motor->electricalAngle(motor);
-        _delay(20);
-        TinyFOC_MOTOR_DEBUG("Zero elec. angle: ", motor->zero_electric_angle);
-        // stop everything
-        motor->setPhaseVoltage(motor, 0, 0, 0);
-        _delay(200);
-    }
-    else
-    {
-        TinyFOC_MOTOR_DEBUG("Skip offset calib.");
-    }
     return exit_flag;
 }
 
@@ -1046,12 +1123,12 @@ int FOCMotor_absoluteZeroSearch(FOCMotor *motor)
     //                    of float is sufficient.
     TinyFOC_MOTOR_DEBUG("Index search...");
     // search the absolute zero with small velocity
-    float limit_vel = motor->velocity_limit;
-    float limit_volt = motor->voltage_limit;
+    FIXP limit_vel = motor->velocity_limit;
+    FIXP limit_volt = motor->voltage_limit;
     motor->velocity_limit = motor->velocity_index_search;
     motor->voltage_limit = motor->voltage_sensor_align;
     motor->shaft_angle = 0;
-    while (motor->sensor->needsSearch(motor->sensor) && motor->shaft_angle < _2PI)
+    while (motor->sensor->needsSearch(motor->sensor) && motor->shaft_angle < FIX_2PI)
     {
         FOCMotor_angleOpenloop(motor, 1.5f * _2PI);
         // call important for some sensors not to loose count
@@ -1081,16 +1158,16 @@ int FOCMotor_absoluteZeroSearch(FOCMotor *motor)
 void FOCMotor_load_default(FOCMotor *motor)
 {
     // maximum angular velocity to be used for positioning
-    motor->velocity_limit = DEF_VEL_LIM;
+    motor->velocity_limit = DEF_VEL_LIM_FIXP;
     // maximum voltage to be set to the motor
-    motor->voltage_limit = DEF_POWER_SUPPLY;
+    motor->voltage_limit = DEF_POWER_SUPPLY_FIXP;
     // not set on the begining
-    motor->current_limit = DEF_CURRENT_LIM;
+    motor->current_limit = DEF_CURRENT_LIM_FIXP;
 
     // index search velocity
-    motor->velocity_index_search = DEF_INDEX_SEARCH_TARGET_VELOCITY;
+    motor->velocity_index_search = DEF_INDEX_SEARCH_TARGET_VELOCITY_FIXP;
     // sensor and motor align voltage
-    motor->voltage_sensor_align = DEF_VOLTAGE_SENSOR_ALIGN;
+    motor->voltage_sensor_align = DEF_VOLTAGE_SENSOR_ALIGN_FIXP;
 
     // default modulation is SinePWM
     motor->foc_modulation = FOCModulationType_SinePWM;
@@ -1111,7 +1188,7 @@ void FOCMotor_load_default(FOCMotor *motor)
     // Initialize phase voltages U alpha and U beta used for inverse Park and Clarke transform
     motor->Ualpha = 0;
     motor->Ubeta = 0;
-    motor->modulation_centered = 1;
+    motor->modulation_centered = 0;
 
     // monitor_port
     motor->monitor_port = NULL;
@@ -1132,16 +1209,16 @@ void FOCMotor_load_default(FOCMotor *motor)
     motor->last_loopfoc_time_us = 0;
     motor->last_move_timestamp_us = 0;
     motor->last_move_time_us = 0;
-
+    motor->zero_electric_angle = NOT_SET;
     motor->enabled = 1;
 
     // sensor
-    motor->sensor_offset = 0.0f;
+    motor->sensor_offset = 0;
     motor->sensor = NULL;
     // current sensor
     motor->current_sense = NULL;
 
-    //filters and controllers
+    // filters and controllers
     PIDController_init(&motor->PID_current_q, DEF_PID_CURR_P, DEF_PID_CURR_I, DEF_PID_CURR_D, DEF_PID_CURR_RAMP, DEF_POWER_SUPPLY, NOT_SET);
     PIDController_init(&motor->PID_current_d, DEF_PID_CURR_P, DEF_PID_CURR_I, DEF_PID_CURR_D, DEF_PID_CURR_RAMP, DEF_POWER_SUPPLY, NOT_SET);
     PIDController_init(&motor->PID_velocity, DEF_PID_VEL_P, DEF_PID_VEL_I, DEF_PID_VEL_D, DEF_PID_VEL_RAMP, DEF_PID_VEL_LIMIT, NOT_SET);
@@ -1151,7 +1228,6 @@ void FOCMotor_load_default(FOCMotor *motor)
     LowPassFilter_init(&motor->LPF_current_d, DEF_CURR_FILTER_Tf, NOT_SET);
     LowPassFilter_init(&motor->LPF_velocity, DEF_VEL_FILTER_Tf, NOT_SET);
     LowPassFilter_init(&motor->LPF_angle, 0.0f, NOT_SET);
-
 
     // default implementation
     motor->init = default_init;

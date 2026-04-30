@@ -37,7 +37,7 @@ static FIXP default_getVelocity(Sensor *sns) {
 
     // floating point equality checks are bad, so instead we check that the angle change is very small
     if (abs(delta_angle) > FIX_FROM_FLOAT(1e-8f)) {
-        sns->velocity = FIX_MUL_DIV_INT(delta_angle, 1000000, Ts);
+        sns->velocity = FIX_MUL_DIV_INT(delta_angle, us_per_s, Ts);
 
         sns->vel_angle_prev = sns->angle_prev;
         sns->vel_full_rotations = sns->full_rotations;

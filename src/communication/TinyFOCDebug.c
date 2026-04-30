@@ -1,6 +1,5 @@
 
 #include "TinyFOCDebug.h"
-#include "stdint.h"
 #ifndef TinyFOC_DISABLE_DEBUG
 
 
@@ -19,12 +18,22 @@ void TinyFOCDebug_println_s(const char* val) {
     }
 }
 
-void TinyFOCDebug_println_f(const char *msg, float val)
+void TinyFOCDebug_println_f(const char *msg, FIXP val)
 {
+    if (_debugPrint != NULL) {
+        _debugPrint->print(msg);
+        _debugPrint->print_f(val, 4); // default to 4 decimal places
+        _debugPrint->newline();
+    }
 }
 
 void TinyFOCDebug_println_i(const char *msg, int val)
 {
+    if (_debugPrint != NULL) {
+        _debugPrint->print(msg);
+        _debugPrint->print_f(FIX_FROM_INT(val), 4); // default to 4 decimal places
+        _debugPrint->newline();
+    }
 }
 
 void TinyFOCDebug_println_c(const char *msg, char val)
@@ -43,7 +52,7 @@ void TinyFOCDebug_print_i(int val)
 {
 }
 
-void TinyFOCDebug_print_f(float val)
+void TinyFOCDebug_print_f(FIXP val)
 {
 }
 

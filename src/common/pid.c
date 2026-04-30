@@ -37,14 +37,14 @@ FIXP PIDController_update(PIDController *pid, FIXP error){
     // u_ik = u_ik_1  + I*Ts/2*(ek + ek_1)
     uint32_t half_dt = dt / 2;
     FIXP error_sum = error + pid->error_prev;
-    FIXP integral_increment = FIX_MUL(FIX_MUL_DIV_INT(pid->I, half_dt, 1000000), error_sum);
+    FIXP integral_increment = FIX_MUL(FIX_MUL_DIV_INT(pid->I, half_dt, us_per_s), error_sum);
     FIXP integral = pid->integral_prev + integral_increment;
     // antiwindup - limit the output
     if(pid->limit != NOT_SET) integral = FIX_CONSTRAIN(integral, -pid->limit, pid->limit);
     // Discrete derivation
     // u_dk = D(ek - ek_1)/Ts
     FIXP error_diff = error - pid->error_prev;
-    FIXP derivative = FIX_MUL_DIV_INT(FIX_MUL(pid->D, error_diff), 1000000,dt);
+    FIXP derivative = FIX_MUL_DIV_INT(FIX_MUL(pid->D, error_diff), us_per_s,dt);
 
     // sum all the components
     FIXP output = proportional + integral + derivative;
@@ -55,11 +55,11 @@ FIXP PIDController_update(PIDController *pid, FIXP error){
     if(pid->output_ramp != NOT_SET && pid->output_ramp > 0){
         // limit the acceleration by ramping the output
         FIXP output_diff = output - pid->output_prev;
-        FIXP output_rate = FIX_MUL_DIV_INT(output_diff, 1000000, dt);
+        FIXP output_rate = FIX_MUL_DIV_INT(output_diff, us_per_s, dt);
         if (output_rate > pid->output_ramp)
-            output = pid->output_prev + FIX_MUL_DIV_INT(pid->output_ramp, dt, 1000000);
+            output = pid->output_prev + FIX_MUL_DIV_INT(pid->output_ramp, dt, us_per_s);
         else if (output_rate < -pid->output_ramp)
-            output = pid->output_prev - FIX_MUL_DIV_INT(pid->output_ramp, dt, 1000000);
+            output = pid->output_prev - FIX_MUL_DIV_INT(pid->output_ramp, dt, us_per_s);
     }
     // saving for the next pass
     pid->integral_prev = integral;

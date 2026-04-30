@@ -14,8 +14,8 @@ void p(char * msg){
     printf(msg);
 }
 
-void p_f(float val, int digits){
-    printf("%.*f", digits, val);
+void p_f(FIXP val, int digits){
+    printf("%.*f", digits, FIX_TO_FLOAT(val));
 }
 
 int r(char *val, int len){
@@ -33,6 +33,7 @@ typedef struct {
     float ke;         // V/(rad/s) (Back-EMF constant, usually 60 / (sqrt(3) * pi * kv))
     float J;          // kg*m^2 (Inertia)
     int pole_pairs;   // Number of permanent magnet pole pairs
+    float sensor_offset; // Electrical angle offset of the sensor
     float damping;         // Nms/rad (Viscous friction)
     float static_friction;  // Nm (Static friction torque)
 } BLDCConfig;
@@ -69,8 +70,9 @@ BLDCConfig mybldc_config = {
     .ke = .4,
     .J = 1e-3f,
     .pole_pairs = 15,
-    .damping = 1e-2f,
-    .static_friction = 0.01f
+    .damping = 1e-3f,
+    .static_friction = 0.0f,
+    .sensor_offset = 0
 };
 
 HallSensor mysensor;
@@ -170,7 +172,7 @@ uint8_t get_hall_state(HallSensor_ll *ll) {
     BLDCState* state = (BLDCState*)ll->param;
     BLDCConfig* cfg = &mybldc_config;
 
-    float ele_angle = fmodf(state->angle * cfg->pole_pairs, 2.0f * M_PI);
+    float ele_angle = fmodf(state->angle * cfg->pole_pairs + cfg->sensor_offset, 2.0f * M_PI);
     if (ele_angle < 0) ele_angle += 2.0f * M_PI;
 
     int h1 = (ele_angle < M_PI) ? 1 : 0;
@@ -240,10 +242,10 @@ int main(void)
     
     BLDCMotor_load_default(&mymotor);
     mymotor.pole_pairs = mybldc_config.pole_pairs;
-    mymotor.KV_rating = mybldc_config.kv;
-    mymotor.axis_inductance.d = mybldc_config.L;
-    mymotor.axis_inductance.q = mybldc_config.L;
-    mymotor.phase_resistance = mybldc_config.R;
+    mymotor.KV_rating = FIX_FROM_FLOAT(mybldc_config.kv);
+    mymotor.axis_inductance.d = FIX_FROM_FLOAT(mybldc_config.L);
+    mymotor.axis_inductance.q = FIX_FROM_FLOAT(mybldc_config.L);
+    mymotor.phase_resistance = FIX_FROM_FLOAT(mybldc_config.R);
 
     FOCDriver_load_default(&mydriver);
     mydriver.ll = &foc_ll;
@@ -270,10 +272,18 @@ int main(void)
     mydriver.init(&mydriver);
     mymotor.init(&mymotor);
     mycs.init(&mycs);
-
+    FOCMotor_updateVoltageLimit(&mymotor, FIX_FROM_FLOAT(8.0f));
+    FOCMotor_updateVelocityLimit(&mymotor, FIX_FROM_FLOAT(100.0f));
     mymotor.initFOC(&mymotor);
 
-    mymotor.move(&mymotor, 5); // Move to 5 rad/s
+    mymotor.move(&mymotor, FIX_FROM_FLOAT(15.0f)); // Move to 20 rad/s
+
+    for(int i = 0; i < 2000; i++){
+        mymotor.loopFOC(&mymotor);
+        _delay(1);
+    }
+
+    mymotor.move(&mymotor, FIX_FROM_FLOAT(-15.0f)); // Move to 20 rad/s
 
     for(int i = 0; i < 2000; i++){
         mymotor.loopFOC(&mymotor);

@@ -111,27 +111,27 @@ void BLDCMotor_enable(FOCMotor *motor)
   FOC functions
 */
 
-float BLDCMotor_estimateBEMF(FOCMotor *motor, float vel){
+FIXP BLDCMotor_estimateBEMF(FOCMotor *motor, FIXP vel){
   // bemf constant is approximately 1/KV rating
   // V_bemf = K_bemf * velocity
-  return vel/(motor->KV_rating*_SQRT3)/_RPM_TO_RADS;
+  return FIX_DIV(FIX_DIV(vel, FIX_RPM_TO_RADS),(motor->KV_rating*FIX_SQRT3));
 }
 
 
 // Method using FOC to set Uq and Ud to the motor at the optimal angle
 // Function implementing Space Vector PWM, Sine PWM and Trapezoidal commutation algorithms
-void BLDCMotor_setPhaseVoltage(FOCMotor *motor, float Uq, float Ud, float angle_el) {
+void BLDCMotor_setPhaseVoltage(FOCMotor *motor, FIXP Uq, FIXP Ud, FIXP angle_el) {
 
-  float center;
+  FIXP center;
   int sector;
-  float _ca,_sa;
+  FIXP _ca,_sa;
 
   switch (motor->foc_modulation)
   {
     case FOCModulationType_Trapezoid_120 :
       // see https://www.youtube.com/watch?v=InzXA7mWBWE Slide 5
       // determine the sector
-      sector = 6 * (int)(_normalizeAngle(angle_el + _PI_6 ) / _2PI); // adding PI/6 to align with other modes
+      sector = (fix_normalize_angle(angle_el + FIX_PI_6 ) * 6) / FIX_2PI; // adding PI/6 to align with other modes
       // centering the voltages around either
       // modulation_centered == true > driver.voltage_limit/2
       // modulation_centered == false > or Adaptable centering, all phases drawn to 0 when Uq=0
@@ -159,7 +159,7 @@ void BLDCMotor_setPhaseVoltage(FOCMotor *motor, float Uq, float Ud, float angle_
     case FOCModulationType_Trapezoid_150 :
       // see https://www.youtube.com/watch?v=InzXA7mWBWE Slide 8
       // determine the sector
-      sector = 12 * (int)(_normalizeAngle(angle_el + _PI_6 ) / _2PI); // adding PI/6 to align with other modes
+      sector = (fix_normalize_angle(angle_el + FIX_PI_6 ) * 12) / FIX_2PI; // adding PI/6 to align with other modes
       // centering the voltages around either
       // modulation_centered == true > driver.voltage_limit/2
       // modulation_centered == false > or Adaptable centering, all phases drawn to 0 when Uq=0
@@ -194,16 +194,16 @@ void BLDCMotor_setPhaseVoltage(FOCMotor *motor, float Uq, float Ud, float angle_
 
         // Sinusoidal PWM modulation
         // Inverse Park + Clarke transformation
-        _sincos(angle_el, &_sa, &_ca);
+        fix_sincos(angle_el, &_sa, &_ca);
 
         // Inverse park transform
-        motor->Ualpha = _ca * Ud - _sa * Uq;  // -sin(angle) * Uq;
-        motor->Ubeta = _sa * Ud + _ca * Uq;    //  cos(angle) * Uq;
+        motor->Ualpha = FIX_MUL(_ca, Ud) - FIX_MUL(_sa, Uq);  // -sin(angle) * Uq;
+        motor->Ubeta = FIX_MUL(_sa, Ud) + FIX_MUL(_ca, Uq);    //  cos(angle) * Uq;
 
         // Clarke transform
         motor->Ua = motor->Ualpha;
-        motor->Ub = -0.5f * motor->Ualpha + _SQRT3_2 * motor->Ubeta;
-        motor->Uc = -0.5f * motor->Ualpha - _SQRT3_2 * motor->Ubeta;
+        motor->Ub = -(motor->Ualpha / 2) + FIX_MUL(FIX_SQRT3_2, motor->Ubeta);
+        motor->Uc = -(motor->Ualpha / 2) - FIX_MUL(FIX_SQRT3_2, motor->Ubeta);
 
         // centering the voltages around either
         // - centered modulation: around driver.voltage_limit/2
@@ -214,20 +214,20 @@ void BLDCMotor_setPhaseVoltage(FOCMotor *motor, float Uq, float Ud, float angle_
         //       off is longer than in centered modulation   
         //     - Both SinePWM and SpaceVectorPWM have the same form for non-centered modulation
       if (motor->modulation_centered) {
-        center = FIX_TO_FLOAT(motor->driver->voltage_limit)/2;
+        center = motor->driver->voltage_limit >> 1;
         if (motor->foc_modulation == FOCModulationType_SpaceVectorPWM){
           // discussed here: https://community.TinyFOC.com/t/embedded-world-2023-stm32-cordic-co-processor/3107/165?u=candas1
           // a bit more info here: https://microchipdeveloper.com/mct5001:which-zsm-is-best
           // Midpoint Clamp
-          float Umin = min(motor->Ua, min(motor->Ub, motor->Uc));
-          float Umax = max(motor->Ua, max(motor->Ub, motor->Uc));
+          FIXP Umin = min(motor->Ua, min(motor->Ub, motor->Uc));
+          FIXP Umax = max(motor->Ua, max(motor->Ub, motor->Uc));
           center -= (Umax+Umin) / 2;
         } 
         motor->Ua += center;
         motor->Ub += center;
         motor->Uc += center;
       }else{
-        float Umin = min(motor->Ua, min(motor->Ub, motor->Uc));
+        FIXP Umin = min(motor->Ua, min(motor->Ub, motor->Uc));
         motor->Ua -= Umin;
         motor->Ub -= Umin;
         motor->Uc -= Umin;
@@ -236,7 +236,7 @@ void BLDCMotor_setPhaseVoltage(FOCMotor *motor, float Uq, float Ud, float angle_
   }
 
   // set the voltages in driver
-  motor->driver->setPwm(motor->driver, FIX_FROM_FLOAT(motor->Ua), FIX_FROM_FLOAT(motor->Ub), FIX_FROM_FLOAT(motor->Uc));
+  motor->driver->setPwm(motor->driver, motor->Ua, motor->Ub, motor->Uc);
 }
 
 

@@ -2,8 +2,6 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 
-
-
 # 1. Define the structure matching the C struct
 # 'f4' = 32-bit float (float in C)
 # 'u4' = 32-bit unsigned integer (unsigned long on Windows/MSVC)
@@ -48,7 +46,7 @@ plt.plot(t, data['velocity'], label='Velocity (rad/s)')
 # plt.plot(t, data['torque'] * data['velocity'], label='mech. Power (W)')
 # plt.plot(t, data['voltage_a'] * data['current_a'] + data['voltage_b'] * data['current_b'] + data['voltage_c'] * data['current_c'], label='el. Power (W)')
 # plt.plot(t, copper_loss, label='Copper Loss (W)')
-plt.ylim(-20, 380)  # Adjust y-axis limits for better visibility
+plt.ylim(-180, 180)  # Adjust y-axis limits for better visibility
 
 plt.xlabel('Time (seconds)')
 plt.ylabel('Value')
@@ -57,3 +55,4 @@ plt.legend()
 plt.grid(True)
 
 plt.show()
+
