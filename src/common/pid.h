@@ -37,7 +37,7 @@ typedef struct s_PIDController
  * @note Sampling time can be changed dynamically as well by modifying the 
  *       variable Ts in runtime.
  */
-PIDController_init(PIDController *pid, FIXP P, FIXP I, FIXP D, FIXP ramp, FIXP limit, uint32_t sampling_time);
+void PIDController_init(PIDController *pid, FIXP P, FIXP I, FIXP D, FIXP ramp, FIXP limit, uint32_t sampling_time);
 FIXP PIDController_update(PIDController *pid, FIXP error);
 void PIDController_reset(PIDController *pid);
 

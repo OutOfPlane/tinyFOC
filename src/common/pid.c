@@ -1,6 +1,6 @@
 #include "pid.h"
 
-PIDController_init(PIDController *pid, FIXP P, FIXP I, FIXP D, FIXP ramp, FIXP limit, uint32_t sampling_time)
+void PIDController_init(PIDController *pid, FIXP P, FIXP I, FIXP D, FIXP ramp, FIXP limit, uint32_t sampling_time)
 {
     pid->P = P;
     pid->I = I;

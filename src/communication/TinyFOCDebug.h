@@ -40,7 +40,7 @@ void TinyFOCDebug_println_s(const char* msg);
 void TinyFOCDebug_println_f(const char* msg, FIXP val);
 void TinyFOCDebug_println_i(const char* msg, int val);
 void TinyFOCDebug_println_c(const char* msg, char val);
-void TinyFOCDebug_println();
+void TinyFOCDebug_println(void);
 void TinyFOCDebug_print_s(const char* msg);
 void TinyFOCDebug_print_i(int val);
 void TinyFOCDebug_print_f(FIXP val);

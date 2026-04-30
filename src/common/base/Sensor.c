@@ -10,7 +10,7 @@ static void default_update(Sensor *sns) {
     sns->angle_prev_ts = _micros();
     FIXP d_angle = val - sns->angle_prev;
     // if overflow happened track it as full rotation
-    if(abs(d_angle) > FIX_FROM_FLOAT(0.8f*_2PI) ) sns->full_rotations += ( d_angle > 0 ) ? -1 : 1; 
+    if(_abs(d_angle) > FIX_FROM_FLOAT(0.8f*_2PI) ) sns->full_rotations += ( d_angle > 0 ) ? -1 : 1; 
     sns->angle_prev = val;
 }
 
@@ -36,7 +36,7 @@ static FIXP default_getVelocity(Sensor *sns) {
     const FIXP delta_angle = current_angle - prev_angle;
 
     // floating point equality checks are bad, so instead we check that the angle change is very small
-    if (abs(delta_angle) > FIX_FROM_FLOAT(1e-8f)) {
+    if (_abs(delta_angle) > FIX_FROM_FLOAT(1e-8f)) {
         sns->velocity = FIX_MUL_DIV_INT(delta_angle, us_per_s, Ts);
 
         sns->vel_angle_prev = sns->angle_prev;

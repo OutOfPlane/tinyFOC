@@ -1,8 +1,8 @@
 #ifndef FIXED_POINT_H
 #define FIXED_POINT_H
 
-#include "stdint.h"
-#include "stdbool.h"
+#include <stdint.h>
+#include <stdbool.h>
 
 // Q15.16 Fixed-Point Arithmetic Library
 // Format: 15 bits integer (including sign) + 16 bits fractional

@@ -1,6 +1,6 @@
 #include "CurrentSense.h"
 #include "../../communication/TinyFOCDebug.h"
-#include "stdint.h"
+#include <stdint.h>
 
 // get current magnitude
 //   - absolute  - if no electrical_angle provided
@@ -27,16 +27,17 @@ static FIXP default_getDCCurrent(CurrentSense *cs, FIXP motor_electrical_angle)
         sign = (FIX_MUL(ABcurrent.beta, ct) - FIX_MUL(ABcurrent.alpha, st)) > 0 ? 1 : -1;
     }
     // return current magnitude
-    return fix_sqrt(FIX_MUL(ABcurrent.alpha, ABcurrent.alpha) + FIX_MUL(ABcurrent.beta, ABcurrent.beta)) * sign;
+    FIXP res = fix_sqrt(FIX_MUL(ABcurrent.alpha, ABcurrent.alpha) + FIX_MUL(ABcurrent.beta, ABcurrent.beta)) * sign;
+    return res;
 }
 
 static void default_enable(CurrentSense *cs) {
     // nothing is done here, but you can override this function
-};
+}
 
 static void default_disable(CurrentSense *cs) {
     // nothing is done here, but you can override this function
-};
+}
 
 // Function finding zero offsets of the ADC
 static void calibrateOffsets(CurrentSense *cs)
