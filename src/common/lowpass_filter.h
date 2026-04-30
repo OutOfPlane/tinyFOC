@@ -26,7 +26,7 @@ typedef struct s_LowPassFilter
  * @note Ts can be changed dynamically as well by modifying the 
  *       variable in runtime.
  */
-LowPassFilter_init(LowPassFilter *lpf, uint32_t Tf_us, uint32_t Ts_us);
+void LowPassFilter_init(LowPassFilter *lpf, uint32_t Tf_us, uint32_t Ts_us);
 FIXP LowPassFilter_update(LowPassFilter *lpf, FIXP x);
 
 #endif // LOWPASS_FILTER_H

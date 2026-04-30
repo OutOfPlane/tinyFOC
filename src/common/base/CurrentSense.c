@@ -33,10 +33,12 @@ static FIXP default_getDCCurrent(CurrentSense *cs, FIXP motor_electrical_angle)
 
 static void default_enable(CurrentSense *cs) {
     // nothing is done here, but you can override this function
+    cs->ll;
 }
 
 static void default_disable(CurrentSense *cs) {
     // nothing is done here, but you can override this function
+    cs->ll;
 }
 
 // Function finding zero offsets of the ADC

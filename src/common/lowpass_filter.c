@@ -1,6 +1,6 @@
 #include "lowpass_filter.h"
 
-LowPassFilter_init(LowPassFilter *lpf, uint32_t time_constant_us, uint32_t sampling_time_us)
+void LowPassFilter_init(LowPassFilter *lpf, uint32_t time_constant_us, uint32_t sampling_time_us)
 {
     lpf->Tf = time_constant_us;
     lpf->Ts = sampling_time_us;

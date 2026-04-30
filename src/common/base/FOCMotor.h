@@ -419,16 +419,13 @@ void FOCMotor_linkCustomMotionControl(FOCMotor *motor, FIXP (*controlMethod)(FOC
  * It filters the value using low pass filtering alpha = 0.1
  * @note - using _micros() function - be aware of its overflow every ~70 minutes
  */
-void FOCMotor_updateLoopFOCTime();
-
-void FOCMotor_updateMotionControlTime();
 
 /** Sensor alignment to electrical 0 angle of the motor */
-int FOCMotor_alignSensor();
+int FOCMotor_alignSensor(FOCMotor *motor);
 /** Current sense and motor phase alignment */
-int FOCMotor_alignCurrentSense();
+int FOCMotor_alignCurrentSense(FOCMotor *motor);
 /** Motor and sensor alignment to the sensors absolute 0 angle  */
-int FOCMotor_absoluteZeroSearch();
+int FOCMotor_absoluteZeroSearch(FOCMotor *motor);
 
 
 #endif

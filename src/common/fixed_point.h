@@ -3,6 +3,7 @@
 
 #include <stdint.h>
 #include <stdbool.h>
+#include <stddef.h>
 
 // Q15.16 Fixed-Point Arithmetic Library
 // Format: 15 bits integer (including sign) + 16 bits fractional
@@ -11,8 +12,8 @@
 
 // Basic macros
 #define FIX_SHIFT 16
-#define FIX_ONE (1 << FIX_SHIFT)  // 65536
-#define FIX_HALF (1 << (FIX_SHIFT - 1))  // 32768
+#define FIX_ONE (((int32_t)1) << FIX_SHIFT)  // 65536
+#define FIX_HALF (((int32_t)1) << (FIX_SHIFT - 1))  // 32768
 #define FIXP int32_t
 #define DFIXP int64_t
 

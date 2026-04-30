@@ -32,11 +32,11 @@ int trap_150_map[12][3] = {
 
 
 // init hardware pins
-int BLDCMotor_init(FOCMotor *motor) {
+void BLDCMotor_init(FOCMotor *motor) {
   if (!motor->driver || !motor->driver->initialized) {
     motor->motor_status = FOCMotorStatus_init_failed;
     TinyFOC_MOTOR_ERROR("Init not possible, driver not init");
-    return 0;
+    return;
   }
   motor->motor_status = FOCMotorStatus_initializing;
   TinyFOC_MOTOR_DEBUG("Init");
@@ -73,7 +73,6 @@ int BLDCMotor_init(FOCMotor *motor) {
   motor->enable(motor);
   _delay(500);
   motor->motor_status = FOCMotorStatus_uncalibrated;
-  return 1;
 }
 
 

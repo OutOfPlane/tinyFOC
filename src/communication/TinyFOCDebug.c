@@ -11,14 +11,14 @@ void TinyFOCDebug_enable(Print* debugPrint) {
 }
 
 
-void TinyFOCDebug_println_s(const char* val) {
+void TinyFOCDebug_println_s(char* val) {
     if (_debugPrint != NULL) {
         _debugPrint->print(val);
         _debugPrint->newline();
     }
 }
 
-void TinyFOCDebug_println_f(const char *msg, FIXP val)
+void TinyFOCDebug_println_f(char *msg, FIXP val)
 {
     if (_debugPrint != NULL) {
         _debugPrint->print(msg);
@@ -27,7 +27,7 @@ void TinyFOCDebug_println_f(const char *msg, FIXP val)
     }
 }
 
-void TinyFOCDebug_println_i(const char *msg, int val)
+void TinyFOCDebug_println_i(char *msg, int val)
 {
     if (_debugPrint != NULL) {
         _debugPrint->print(msg);
@@ -36,15 +36,15 @@ void TinyFOCDebug_println_i(const char *msg, int val)
     }
 }
 
-void TinyFOCDebug_println_c(const char *msg, char val)
+void TinyFOCDebug_println_c(char *msg, char val)
 {
 }
 
-void TinyFOCDebug_println()
+void TinyFOCDebug_println(void)
 {
 }
 
-void TinyFOCDebug_print_s(const char *msg)
+void TinyFOCDebug_print_s(char *msg)
 {
 }
 
