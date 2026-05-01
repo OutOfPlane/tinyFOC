@@ -2,6 +2,8 @@
 #define FOCUTILS_LIB_H
 
 #include "fixed_point.h"
+#include "defaults.h"
+#include "tinyfoc_conf.h"
 
 
 
@@ -38,8 +40,6 @@
 #define _HIGH_Z _HIGH_IMPEDANCE
 #define _ACTIVE 1
 #define _NC ((int) NOT_SET)
-
-#define MIN_ANGLE_DETECT_MOVEMENT (_2PI/101.0f)
 
 // dq variables
 struct DQ_s
@@ -80,7 +80,7 @@ typedef struct{
     void (*write)(char val);
     void (*newline)(void);
     void (*print)(char* msg);
-    void (*print_f)(FIXP val, int digits);
+    void (*print_f)(FIXP val, int digits) __reentrant;
     int (*read)(char* val, int len);
 }Print;
 

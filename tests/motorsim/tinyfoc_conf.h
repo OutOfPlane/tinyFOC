@@ -1,0 +1,4 @@
+
+//Current Sense API
+#define CURRENT_SENSE_CUSTOM_INIT_IMPL
+#define CURRENT_SENSE_DEFAULT

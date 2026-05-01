@@ -1,5 +1,7 @@
-#include "BLDCMotor.h"
+#include "FOCMotor.h"
 #include "./communication/TinyFOCDebug.h"
+
+#if(MOTOR_TYPE == BLDC)
 
 
 // see https://www.youtube.com/watch?v=InzXA7mWBWE Slide 5
@@ -32,7 +34,7 @@ int trap_150_map[12][3] = {
 
 
 // init hardware pins
-void BLDCMotor_init(FOCMotor *motor) {
+void FOCMotor_init(FOCMotor *motor) {
   if (!motor->driver || !motor->driver->initialized) {
     motor->motor_status = FOCMotorStatus_init_failed;
     TinyFOC_MOTOR_ERROR("Init not possible, driver not init");
@@ -70,33 +72,33 @@ void BLDCMotor_init(FOCMotor *motor) {
   _delay(500);
   // enable motor
   TinyFOC_MOTOR_DEBUG("Enable driver.");
-  motor->enable(motor);
+  FOCMotor_enable(motor);
   _delay(500);
   motor->motor_status = FOCMotorStatus_uncalibrated;
 }
 
 
 // disable motor driver
-void BLDCMotor_disable(FOCMotor *motor)
+void FOCMotor_disable(FOCMotor *motor)
 {
   // disable the current sense
-  if(motor->current_sense) motor->current_sense->disable(motor->current_sense);
+  if(motor->current_sense) CurrentSense_disable(motor->current_sense);
   // set zero to PWM
-  motor->driver->setPwm(motor->driver, 0, 0, 0);
+  FOCDriver_setPwm(motor->driver, 0, 0, 0);
   // disable the driver
-  motor->driver->disable(motor->driver);
+  FOCDriver_disable(motor->driver);
   // motor status update
   motor->enabled = 0;
 }
 // enable motor driver
-void BLDCMotor_enable(FOCMotor *motor)
+void FOCMotor_enable(FOCMotor *motor)
 {
   // enable the driver
-  motor->driver->enable(motor->driver);
+  FOCDriver_enable(motor->driver);
   // set zero to PWM
-  motor->driver->setPwm(motor->driver, 0, 0, 0);
+  FOCDriver_setPwm(motor->driver, 0, 0, 0);
   // enable the current sense
-  if(motor->current_sense) motor->current_sense->enable(motor->current_sense);
+  if(motor->current_sense) CurrentSense_enable(motor->current_sense);
   // reset the pids
   PIDController_reset(&motor->PID_velocity);
   PIDController_reset(&motor->P_angle);
@@ -110,16 +112,17 @@ void BLDCMotor_enable(FOCMotor *motor)
   FOC functions
 */
 
-FIXP BLDCMotor_estimateBEMF(FOCMotor *motor, FIXP vel){
+FIXP FOCMotor_estimateBEMF(FOCMotor *motor, FIXP vel){
   // bemf constant is approximately 1/KV rating
   // V_bemf = K_bemf * velocity
   return FIX_DIV(FIX_DIV(vel, FIX_RPM_TO_RADS),(motor->KV_rating*FIX_SQRT3));
 }
 
 
+
 // Method using FOC to set Uq and Ud to the motor at the optimal angle
 // Function implementing Space Vector PWM, Sine PWM and Trapezoidal commutation algorithms
-void BLDCMotor_setPhaseVoltage(FOCMotor *motor, FIXP Uq, FIXP Ud, FIXP angle_el) {
+void FOCMotor_setPhaseVoltage(FOCMotor *motor, FIXP Uq, FIXP Ud, FIXP angle_el) {
 
   FIXP center;
   int sector;
@@ -140,17 +143,17 @@ void BLDCMotor_setPhaseVoltage(FOCMotor *motor, FIXP Uq, FIXP Ud, FIXP angle_el)
         motor->Ua= center;
         motor->Ub = trap_120_map[sector][1] * Uq + center;
         motor->Uc = trap_120_map[sector][2] * Uq + center;
-        motor->driver->setPhaseState(motor->driver, PHASE_OFF, PHASE_ON, PHASE_ON); // disable phase if possible
+        FOCDriver_setPhaseState(motor->driver, PHASE_OFF, PHASE_ON, PHASE_ON); // disable phase if possible
       }else if(trap_120_map[sector][1]  == _HIGH_IMPEDANCE){
         motor->Ua = trap_120_map[sector][0] * Uq + center;
         motor->Ub = center;
         motor->Uc = trap_120_map[sector][2] * Uq + center;
-        motor->driver->setPhaseState(motor->driver, PHASE_ON, PHASE_OFF, PHASE_ON);// disable phase if possible
+        FOCDriver_setPhaseState(motor->driver, PHASE_ON, PHASE_OFF, PHASE_ON);// disable phase if possible
       }else{
         motor->Ua = trap_120_map[sector][0] * Uq + center;
         motor->Ub = trap_120_map[sector][1] * Uq + center;
         motor->Uc = center;
-        motor->driver->setPhaseState(motor->driver, PHASE_ON, PHASE_ON, PHASE_OFF);// disable phase if possible
+        FOCDriver_setPhaseState(motor->driver, PHASE_ON, PHASE_ON, PHASE_OFF);// disable phase if possible
       }
 
     break;
@@ -168,22 +171,22 @@ void BLDCMotor_setPhaseVoltage(FOCMotor *motor, FIXP Uq, FIXP Ud, FIXP angle_el)
         motor->Ua= center;
         motor->Ub = trap_150_map[sector][1] * Uq + center;
         motor->Uc = trap_150_map[sector][2] * Uq + center;
-        motor->driver->setPhaseState(motor->driver, PHASE_OFF, PHASE_ON, PHASE_ON); // disable phase if possible
+        FOCDriver_setPhaseState(motor->driver, PHASE_OFF, PHASE_ON, PHASE_ON); // disable phase if possible
       }else if(trap_150_map[sector][1]  == _HIGH_IMPEDANCE){
         motor->Ua = trap_150_map[sector][0] * Uq + center;
         motor->Ub = center;
         motor->Uc = trap_150_map[sector][2] * Uq + center;
-        motor->driver->setPhaseState(motor->driver, PHASE_ON, PHASE_OFF, PHASE_ON); // disable phase if possible
+        FOCDriver_setPhaseState(motor->driver, PHASE_ON, PHASE_OFF, PHASE_ON); // disable phase if possible
       }else if(trap_150_map[sector][2]  == _HIGH_IMPEDANCE){
         motor->Ua = trap_150_map[sector][0] * Uq + center;
         motor->Ub = trap_150_map[sector][1] * Uq + center;
         motor->Uc = center;
-        motor->driver->setPhaseState(motor->driver, PHASE_ON, PHASE_ON, PHASE_OFF); // disable phase if possible
+        FOCDriver_setPhaseState(motor->driver, PHASE_ON, PHASE_ON, PHASE_OFF); // disable phase if possible
       }else{
         motor->Ua = trap_150_map[sector][0] * Uq + center;
         motor->Ub = trap_150_map[sector][1] * Uq + center;
         motor->Uc = trap_150_map[sector][2] * Uq + center;
-        motor->driver->setPhaseState(motor->driver, PHASE_ON, PHASE_ON, PHASE_ON); // enable all phases
+        FOCDriver_setPhaseState(motor->driver, PHASE_ON, PHASE_ON, PHASE_ON); // enable all phases
       }
 
     break;
@@ -235,31 +238,7 @@ void BLDCMotor_setPhaseVoltage(FOCMotor *motor, FIXP Uq, FIXP Ud, FIXP angle_el)
   }
 
   // set the voltages in driver
-  motor->driver->setPwm(motor->driver, motor->Ua, motor->Ub, motor->Uc);
+  FOCDriver_setPwm(motor->driver, motor->Ua, motor->Ub, motor->Uc);
 }
 
-
-void BLDCMotor_load_default(FOCMotor *motor)
-{
-  FOCMotor_load_default(motor);
-  // save pole pairs number
-  motor->pole_pairs = NOT_SET;
-  // save phase resistance number
-  motor->phase_resistance = NOT_SET;
-  // save back emf constant KV = 1/KV
-  // 1/sqrt(3) - rms value
-  motor->KV_rating = NOT_SET;
-  // save phase inductance
-  motor->axis_inductance.d = NOT_SET;
-  motor->axis_inductance.q = NOT_SET;
-  motor->phase_inductance = NOT_SET;  // FOR BACKWARDS COMPATIBILITY
-
-  // torque control type is voltage by default
-  motor->torque_controller = TorqueControlType_voltage;
-
-  motor->estimateBEMF = BLDCMotor_estimateBEMF;
-  motor->setPhaseVoltage = BLDCMotor_setPhaseVoltage;
-  motor->init = BLDCMotor_init;
-  motor->enable = BLDCMotor_enable;
-  motor->disable = BLDCMotor_disable;
-}
+#endif

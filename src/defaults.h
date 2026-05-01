@@ -54,3 +54,4 @@
 
 // current sense default parameters
 #define DEF_LPF_PER_PHASE_CURRENT_SENSE_Tf ((uint32_t)(1e6f*0.0f))  //!< default currnet sense per phase low pass filter time constant 
+#define MIN_ANGLE_DETECT_MOVEMENT (_2PI/101.0f)

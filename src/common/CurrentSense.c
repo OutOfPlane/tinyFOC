@@ -1,14 +1,14 @@
 #include "CurrentSense.h"
-#include "../../communication/TinyFOCDebug.h"
+#include "../communication/TinyFOCDebug.h"
 #include <stdint.h>
 
 // get current magnitude
 //   - absolute  - if no electrical_angle provided
 //   - signed    - if angle provided
-static FIXP default_getDCCurrent(CurrentSense *cs, FIXP motor_electrical_angle)
+FIXP CurrentSense_getDCCurrent(CurrentSense *cs, FIXP motor_electrical_angle)
 {
     // read current phase currents
-    PhaseCurrent_s current = cs->getPhaseCurrents(cs);
+    PhaseCurrent_s current = CurrentSense_getPhaseCurrents(cs);
 
     // calculate clarke transform
     ABCurrent_s ABcurrent = CurrentSense_getABCurrents(cs, current);
@@ -19,7 +19,7 @@ static FIXP default_getDCCurrent(CurrentSense *cs, FIXP motor_electrical_angle)
     // if motor angle provided function returns signed value of the current
     // determine the sign of the current
     // sign(atan2(current.q, current.d)) is the same as c.q > 0 ? 1 : -1
-    if (motor_electrical_angle)
+    if (_isset(motor_electrical_angle))
     {
         FIXP ct;
         FIXP st;
@@ -31,18 +31,16 @@ static FIXP default_getDCCurrent(CurrentSense *cs, FIXP motor_electrical_angle)
     return res;
 }
 
-static void default_enable(CurrentSense *cs) {
+void CurrentSense_enable(CurrentSense *cs) {
     // nothing is done here, but you can override this function
-    cs->ll;
 }
 
-static void default_disable(CurrentSense *cs) {
+void CurrentSense_disable(CurrentSense *cs) {
     // nothing is done here, but you can override this function
-    cs->ll;
 }
 
 // Function finding zero offsets of the ADC
-static void calibrateOffsets(CurrentSense *cs)
+void calibrateOffsets(CurrentSense *cs)
 {
     const int calibration_rounds = 1000;
 
@@ -54,7 +52,7 @@ static void calibrateOffsets(CurrentSense *cs)
     PhaseCurrent_s current;
     for (int i = 0; i < calibration_rounds; i++)
     {
-        cs->ll->readcurrents(cs->ll, &current.a, &current.b, &current.c);
+        CurrentSense_ll_readcurrents(cs->params, &current.a, &current.b, &current.c);
         cs->offset_ia += current.a;
         cs->offset_ib += current.b;
         cs->offset_ic += current.c;
@@ -67,23 +65,21 @@ static void calibrateOffsets(CurrentSense *cs)
 }
 
 // Inline sensor init function
-static int default_init(CurrentSense *cs)
+int CurrentSense_init(CurrentSense *cs)
 {
     // configure ADC variables
-    if (cs->ll != NULL && cs->ll->init != NULL)
-        cs->ll->init(cs->ll);
+    // set the initialized flag
+    cs->initialized = CurrentSense_ll_init(cs->params);
     // calibrate zero offsets
     calibrateOffsets(cs);
-    // set the initialized flag
-    cs->initialized = cs->ll->initOK;
     return cs->initialized;
 }
 
 // read all three phase currents (if possible 2 or 3)
-static PhaseCurrent_s default_getPhaseCurrents(CurrentSense *cs)
+PhaseCurrent_s CurrentSense_getPhaseCurrents(CurrentSense *cs)
 {
     PhaseCurrent_s current;
-    cs->ll->readcurrents(cs->ll, &current.a, &current.b, &current.c);
+    CurrentSense_ll_readcurrents(cs->params, &current.a, &current.b, &current.c);
     current.a = (current.a - cs->offset_ia); // amps
     current.b = (current.b - cs->offset_ib); // amps
     current.c = (current.c - cs->offset_ic); // amps
@@ -98,7 +94,7 @@ static PhaseCurrent_s default_getPhaseCurrents(CurrentSense *cs)
 DQCurrent_s CurrentSense_getFOCCurrents(CurrentSense *cs, FIXP angle_el)
 {
     // read current phase currents
-    PhaseCurrent_s current = cs->getPhaseCurrents(cs);
+    PhaseCurrent_s current = CurrentSense_getPhaseCurrents(cs);
 
     // calculate clarke transform
     ABCurrent_s ABcurrent = CurrentSense_getABCurrents(cs, current);
@@ -214,17 +210,17 @@ void CurrentSense_linkDriver(CurrentSense *cs, FOCDriver *_driver)
 // Helper function to read and average phase currents
 PhaseCurrent_s CurrentSense_readAverageCurrents(CurrentSense *cs, int N)
 {
-    PhaseCurrent_s c = cs->getPhaseCurrents(cs);
+    PhaseCurrent_s c = CurrentSense_getPhaseCurrents(cs);
     for (int i = 0; i < N; i++)
     {
-        PhaseCurrent_s c1 = cs->getPhaseCurrents(cs);
+        PhaseCurrent_s c1 = CurrentSense_getPhaseCurrents(cs);
         c.a = FIX_MUL(c.a, FIX_FROM_FLOAT(0.6f)) + FIX_MUL(c1.a, FIX_FROM_FLOAT(0.4f));
         c.b = FIX_MUL(c.b, FIX_FROM_FLOAT(0.6f)) + FIX_MUL(c1.b, FIX_FROM_FLOAT(0.4f));
         c.c = FIX_MUL(c.c, FIX_FROM_FLOAT(0.6f)) + FIX_MUL(c1.c, FIX_FROM_FLOAT(0.4f));
         _delay(3);
     }
     return c;
-};
+}
 
 // Function aligning the current sense with motor driver
 // if all pins are connected well none of this is really necessary! - can be avoided
@@ -234,7 +230,7 @@ PhaseCurrent_s CurrentSense_readAverageCurrents(CurrentSense *cs, int N)
 // 2 - success but pins reconfigured
 // 3 - success but gains inverted
 // 4 - success but pins reconfigured and gains inverted
-static int CurrentSense_alignBLDCDriver(CurrentSense *cs, FIXP voltage, FOCDriver *bldc_driver, bool modulation_centered)
+int CurrentSense_alignBLDCDriver(CurrentSense *cs, FIXP voltage, FOCDriver *bldc_driver, bool modulation_centered)
 {
 
     // bool phases_switched = 0;
@@ -451,7 +447,7 @@ static int CurrentSense_alignBLDCDriver(CurrentSense *cs, FIXP voltage, FOCDrive
 // 2 - success but pins reconfigured
 // 3 - success but gains inverted
 // 4 - success but pins reconfigured and gains inverted
-static int CurrentSense_alignStepperDriver(CurrentSense *cs, FIXP voltage, FOCDriver *stepper_driver, bool modulation_centered)
+int CurrentSense_alignStepperDriver(CurrentSense *cs, FIXP voltage, FOCDriver *stepper_driver, bool modulation_centered)
 {
 
     // _UNUSED(modulation_centered);
@@ -533,7 +529,7 @@ static int CurrentSense_alignStepperDriver(CurrentSense *cs, FIXP voltage, FOCDr
     // return exit_flag;
 }
 
-static int CurrentSense_alignHybridDriver(CurrentSense *cs, FIXP voltage, FOCDriver *bldc_driver, bool modulation_centered)
+int CurrentSense_alignHybridDriver(CurrentSense *cs, FIXP voltage, FOCDriver *bldc_driver, bool modulation_centered)
 {
 
     // _UNUSED(modulation_centered);
@@ -777,7 +773,7 @@ static int CurrentSense_alignHybridDriver(CurrentSense *cs, FIXP voltage, FOCDri
 // 3 - success but gains inverted
 // 4 - success but pins reconfigured and gains inverted
 // IMPORTANT, this function can be overriden in the child class
-static int default_driverAlign(CurrentSense *cs, FIXP voltage, bool modulation_centered)
+int CurrentSense_driverAlign(CurrentSense *cs, FIXP voltage, bool modulation_centered)
 {
 
     int exit_flag = 1;
@@ -805,13 +801,6 @@ static int default_driverAlign(CurrentSense *cs, FIXP voltage, bool modulation_c
 
 void CurrentSense_load_default(CurrentSense *cs)
 {
-    cs->init = default_init;
-    cs->driverAlign = default_driverAlign;
-    cs->getPhaseCurrents = default_getPhaseCurrents;
-    cs->getDCCurrent = default_getDCCurrent;
-    cs->enable = default_enable;
-    cs->disable = default_disable;
-    cs->ll = NULL;
     cs->driver = NULL;
     cs->skip_align = true;
     cs->initialized = false;

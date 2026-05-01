@@ -1,10 +1,10 @@
 #include "Sensor.h"
-#include "../time_utils.h"
+#include "time_utils.h"
 
 
 
-static void default_update(Sensor *sns) {
-    FIXP val = sns->getSensorAngle(sns);
+void Sensor_update(Sensor *sns) {
+    FIXP val = Sensor_getSensorAngle(sns);
     if (val<0) // sensor angles are strictly non-negative. Negative values are used to signal errors.
         return; // TODO signal error, e.g. via a flag and counter
     sns->angle_prev_ts = _micros();
@@ -16,7 +16,7 @@ static void default_update(Sensor *sns) {
 
 
  /** get current angular velocity (rad/s) */
-static FIXP default_getVelocity(Sensor *sns) {
+FIXP Sensor_getVelocity(Sensor *sns) {
     // calculate sample time
     // if timestamps were unsigned, we could get rid of this section, unsigned overflow handles it correctly
     uint32_t Ts = (sns->angle_prev_ts - sns->vel_angle_prev_ts);
@@ -49,61 +49,51 @@ static FIXP default_getVelocity(Sensor *sns) {
 
 
 
-static void default_init(Sensor *sns) {
+void Sensor_init(Sensor *sns) {
     // initialize all the internal variables of Sensor to ensure a "smooth" startup (without a 'jump' from zero)
-    sns->getSensorAngle(sns); // call once
+    Sensor_getSensorAngle(sns); // call once
     _delay_us(1);
-    sns->vel_angle_prev = sns->getSensorAngle(sns); // call again
+    sns->vel_angle_prev = Sensor_getSensorAngle(sns); // call again
     sns->vel_angle_prev_ts = _micros();
     _delay(1);
-    sns->getSensorAngle(sns); // call once
+    Sensor_getSensorAngle(sns); // call once
     _delay_us(1);
-    sns->angle_prev = sns->getSensorAngle(sns); // call again
+    sns->angle_prev = Sensor_getSensorAngle(sns); // call again
     sns->angle_prev_ts = _micros();
 }
 
 
-static FIXP default_getMechanicalAngle(Sensor *sns) {
+FIXP default_getMechanicalAngle(Sensor *sns) {
     return sns->angle_prev;
 }
 
 
 
-static FIXP default_getAngle(Sensor *sns){
+FIXP default_getAngle(Sensor *sns){
     return sns->full_rotations * FIX_2PI + sns->angle_prev;
 }
 
 
 
-static FIXP default_getPreciseAngle(Sensor *sns) {
-    return sns->getAngle(sns); // default implementation, can be overridden in subclasses
+FIXP Sensor_getPreciseAngle(Sensor *sns) {
+    return Sensor_getAngle(sns); // default implementation, can be overridden in subclasses
 }
 
 
 
-static int32_t default_getFullRotations(Sensor *sns) {
+int32_t Sensor_getFullRotations(Sensor *sns) {
     return sns->full_rotations;
 }
 
 
 
-static int default_needsSearch(Sensor *sns) {
+int Sensor_needsSearch(Sensor *sns) {
     return 0; // default false
 }
 
 
 void Sensor_load_default(Sensor *sns)
 {
-    sns->getMechanicalAngle = default_getMechanicalAngle;
-    sns->getAngle = default_getAngle;
-    sns->getPreciseAngle = default_getPreciseAngle;
-    sns->getVelocity = default_getVelocity;
-    sns->getFullRotations = default_getFullRotations;
-    sns->update = default_update;
-    sns->needsSearch = default_needsSearch;
-    sns->getSensorAngle = default_getMechanicalAngle;
-    sns->init = default_init;
-
     sns->min_elapsed_time = 100;
     sns->velocity = 0;
     sns->angle_prev = 0;

@@ -4,11 +4,11 @@
 #include "Sensor.h"
 #include "CurrentSense.h"
 
-#include "../time_utils.h"
-#include "../foc_utils.h"
-#include "../defaults.h"
-#include "../pid.h"
-#include "../lowpass_filter.h"
+#include "time_utils.h"
+#include "foc_utils.h"
+#include "defaults.h"
+#include "pid.h"
+#include "lowpass_filter.h"
 #include "communication/TinyFOCDebug.h"
 
 #define MOT_ERR "ERR-MOT:"
@@ -109,112 +109,6 @@ enum FOCMotorStatus
 
 typedef struct s_FOCMotor
 {
-  /**  Motor hardware init function */
-  void (*init)(struct s_FOCMotor *motor);
-
-  /** Motor disable function */
-  void (*disable)(struct s_FOCMotor *motor);
-
-  /** Motor enable function */
-  void (*enable)(struct s_FOCMotor *motor);
-
-  /**
-   * Method using FOC to set Uq to the motor at the optimal angle
-   * Heart of the FOC algorithm
-   *
-   * @param Uq Current voltage in q axis to set to the motor
-   * @param Ud Current voltage in d axis to set to the motor
-   * @param angle_el current electrical angle of the motor
-   */
-  void (*setPhaseVoltage)(struct s_FOCMotor *motor, FIXP Uq, FIXP Ud, FIXP angle_el);
-
-  /**
-   * Estimation of the Back EMF voltage
-   *
-   * @param velocity - current shaft velocity
-   */
-  FIXP (*estimateBEMF)(struct s_FOCMotor *motor, FIXP velocity);
-
-  /**
-   * Function initializing FOC algorithm
-   * and aligning sensor's and motors' zero position
-   *
-   * - If zero_electric_offset parameter is set the alignment procedure is skipped
-   */
-  void (*initFOC)(struct s_FOCMotor *motor);
-
-  /**
-   * Function running FOC algorithm in real-time
-   * it calculates the gets motor angle and sets the appropriate voltages
-   * to the phase pwm signals
-   * - the faster you can run it the better Arduino UNO ~1ms, Bluepill ~ 100us
-   */
-  void (*loopFOC)(struct s_FOCMotor *motor);
-
-  /**
-   * Function executing the control loops set by the controller.
-   *
-   * @param target  Either voltage, angle or velocity based on the motor.controller
-   *                If it is not set the motor will use the target set in its variable motor.target
-   *
-   * This function doesn't need to be run upon each loop execution - depends of the use case
-   */
-  void (*move)(struct s_FOCMotor *motor, FIXP target);
-
-  /**
-   * Function linking a motor and a sensor
-   *
-   * @param sensor Sensor class  wrapper for the FOC algorihtm to read the motor angle and velocity
-   */
-  void (*linkSensor)(struct s_FOCMotor *motor, Sensor *sensor);
-
-  /**
-   * Function linking a motor and current sensing
-   *
-   * @param current_sense CurrentSense class wrapper for the FOC algorihtm to read the motor current measurements
-   */
-  void (*linkCurrentSense)(struct s_FOCMotor *motor, CurrentSense *current_sense);
-
-  /**
-   * Function linking a motor and a foc driver
-   *
-   * @param driver BLDCDriver class implementing all the hardware specific functions necessary PWM setting
-   */
-  void (*linkDriver)(struct s_FOCMotor *motor, FOCDriver *driver);
-
-  // State calculation methods
-  /** Shaft angle calculation in radians [rad] */
-  FIXP (*shaftAngle)(struct s_FOCMotor *motor);
-  /**
-   * Shaft angle calculation function in radian per second [rad/s]
-   * It implements low pass filtering
-   */
-  FIXP (*shaftVelocity)(struct s_FOCMotor *motor);
-
-  /**
-   * Electrical angle calculation
-   */
-  FIXP (*electricalAngle)(struct s_FOCMotor *motor);
-
-  /**
-   * Measure resistance and inductance of a motor and print results to debug.
-   * If a sensor is available, an estimate of zero electric angle will be reported too.
-   * @param voltage The voltage applied to the motor
-   * @param correction_factor  Is 1.5 for 3 phase motors, because we measure over a series-parallel connection. TODO: what about 2 phase motors?
-   * @returns 0 for success, >0 for failure
-   */
-  int (*characteriseMotor)(struct s_FOCMotor *motor, FIXP voltage, FIXP correction_factor);
-
-  /**
-   * Auto-tune the current controller PID parameters based on desired bandwidth.
-   * Uses a simple method that assumes a first order system and requires knowledge of
-   * the motor phase resistance and inductance (if not set, the characteriseMotor function can be used).
-   *
-   * @param bandwidth Desired closed-loop bandwidth in Hz.
-   * @returns returns 0 for success, >0 for failure
-   */
-  int (*tuneCurrentController)(struct s_FOCMotor *motor, FIXP bandwidth);
-
   // state variables
   FIXP target;                //!< current target value - depends of the controller
   FIXP feed_forward_velocity; //!< current feed forward velocity
@@ -282,21 +176,9 @@ typedef struct s_FOCMotor
 
   FOCDriver *driver; //!< FOCDriver instance
 
-  /**
-   * Function providing BLDCMotor class with the
-   * Serial interface and enabling monitoring mode
-   *
-   * @param serial Monitoring Serial class reference
-   */
-  void (*useMonitoring)(struct s_FOCMotor *motor, Print *serial);
   // monitoring functions
   Print *monitor_port; //!< Serial terminal variable if provided
 
-  /**
-   * Utility function intended to be used with serial plotter to monitor motor variables
-   * significantly slowing the execution down!!!!
-   */
-  void (*monitor)(struct s_FOCMotor *motor);
   unsigned int monitor_downsample; //!< show monitor outputs each monitor_downsample calls
   char monitor_start_char;         //!< monitor starting character
   char monitor_end_char;           //!< monitor outputs ending character
@@ -328,10 +210,132 @@ typedef struct s_FOCMotor
   // open loop variables
   uint32_t open_loop_timestamp;
 
-  // function pointer for custom control method
-  FIXP (*customMotionControlCallback)(struct s_FOCMotor *motor);
+  #if(MOTOR_TYPE == BLDC)
+
+
+  #endif
 
 } FOCMotor;
+
+/**  Motor hardware init function */
+void FOCMotor_init(struct s_FOCMotor *motor);
+
+/** Motor disable function */
+void FOCMotor_disable(struct s_FOCMotor *motor);
+
+/** Motor enable function */
+void FOCMotor_enable(struct s_FOCMotor *motor);
+
+/**
+ * Function providing BLDCMotor class with the
+ * Serial interface and enabling monitoring mode
+ *
+ * @param serial Monitoring Serial class reference
+ */
+void FOCMotor_useMonitoring(struct s_FOCMotor *motor, Print *serial);
+
+/**
+ * Utility function intended to be used with serial plotter to monitor motor variables
+ * significantly slowing the execution down!!!!
+ */
+void FOCMotor_monitor(struct s_FOCMotor *motor);
+
+/**
+ * Method using FOC to set Uq to the motor at the optimal angle
+ * Heart of the FOC algorithm
+ *
+ * @param Uq Current voltage in q axis to set to the motor
+ * @param Ud Current voltage in d axis to set to the motor
+ * @param angle_el current electrical angle of the motor
+ */
+void FOCMotor_setPhaseVoltage(struct s_FOCMotor *motor, FIXP Uq, FIXP Ud, FIXP angle_el);
+
+/**
+ * Estimation of the Back EMF voltage
+ *
+ * @param velocity - current shaft velocity
+ */
+FIXP FOCMotor_estimateBEMF(struct s_FOCMotor *motor, FIXP velocity);
+
+/**
+ * Function initializing FOC algorithm
+ * and aligning sensor's and motors' zero position
+ *
+ * - If zero_electric_offset parameter is set the alignment procedure is skipped
+ */
+int FOCMotor_initFOC(struct s_FOCMotor *motor);
+
+/**
+ * Function running FOC algorithm in real-time
+ * it calculates the gets motor angle and sets the appropriate voltages
+ * to the phase pwm signals
+ * - the faster you can run it the better Arduino UNO ~1ms, Bluepill ~ 100us
+ */
+void FOCMotor_loopFOC(struct s_FOCMotor *motor);
+
+/**
+ * Function executing the control loops set by the controller.
+ *
+ * @param target  Either voltage, angle or velocity based on the motor.controller
+ *                If it is not set the motor will use the target set in its variable motor.target
+ *
+ * This function doesn't need to be run upon each loop execution - depends of the use case
+ */
+void FOCMotor_move(struct s_FOCMotor *motor, FIXP target);
+
+/**
+ * Function linking a motor and a sensor
+ *
+ * @param sensor Sensor class  wrapper for the FOC algorihtm to read the motor angle and velocity
+ */
+void FOCMotor_linkSensor(struct s_FOCMotor *motor, Sensor *sensor);
+
+/**
+ * Function linking a motor and current sensing
+ *
+ * @param current_sense CurrentSense class wrapper for the FOC algorihtm to read the motor current measurements
+ */
+void FOCMotor_linkCurrentSense(struct s_FOCMotor *motor, CurrentSense *current_sense);
+
+/**
+ * Function linking a motor and a foc driver
+ *
+ * @param driver BLDCDriver class implementing all the hardware specific functions necessary PWM setting
+ */
+void FOCMotor_linkDriver(struct s_FOCMotor *motor, FOCDriver *driver);
+
+// State calculation methods
+/** Shaft angle calculation in radians [rad] */
+FIXP FOCMotor_shaftAngle(struct s_FOCMotor *motor);
+/**
+ * Shaft angle calculation function in radian per second [rad/s]
+ * It implements low pass filtering
+ */
+FIXP FOCMotor_shaftVelocity(struct s_FOCMotor *motor);
+
+/**
+ * Electrical angle calculation
+ */
+FIXP FOCMotor_electricalAngle(struct s_FOCMotor *motor);
+
+/**
+ * Measure resistance and inductance of a motor and print results to debug.
+ * If a sensor is available, an estimate of zero electric angle will be reported too.
+ * @param voltage The voltage applied to the motor
+ * @param correction_factor  Is 1.5 for 3 phase motors, because we measure over a series-parallel connection. TODO: what about 2 phase motors?
+ * @returns 0 for success, >0 for failure
+ */
+int FOCMotor_characteriseMotor(struct s_FOCMotor *motor, FIXP voltage, FIXP correction_factor);
+
+/**
+ * Auto-tune the current controller PID parameters based on desired bandwidth.
+ * Uses a simple method that assumes a first order system and requires knowledge of
+ * the motor phase resistance and inductance (if not set, the characteriseMotor function can be used).
+ *
+ * @param bandwidth Desired closed-loop bandwidth in Hz.
+ * @returns returns 0 for success, >0 for failure
+ */
+int FOCMotor_tuneCurrentController(struct s_FOCMotor *motor, FIXP bandwidth);
 
 void FOCMotor_load_default(FOCMotor *motor);
 

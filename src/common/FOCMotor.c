@@ -1,39 +1,34 @@
-#include "common/base/FOCMotor.h"
+#include "common/FOCMotor.h"
 
 // time measuring function
 // It filters the value using low pass filtering alpha = 0.1
-static void updateTime(uint32_t *elapsed_time, uint32_t *last_timestamp_us)
+void updateTime(uint32_t *elapsed_time, uint32_t *last_timestamp_us)
 {
     uint32_t now = _micros();
     *elapsed_time = now - *last_timestamp_us;
     *last_timestamp_us = now;
 }
 
-static void linkCustomMotionControl(FOCMotor *motor, FIXP (*controlMethod)(FOCMotor *motor))
-{
-    motor->customMotionControlCallback = controlMethod;
-}
-
-static void updateLoopFOCTime(FOCMotor *motor)
+void updateLoopFOCTime(FOCMotor *motor)
 {
     motor->last_loopfoc_time_us = motor->loopfoc_time_us;
     updateTime(&(motor->loopfoc_time_us), &(motor->last_loopfoc_timestamp_us));
 }
 
-static void updateMotionControlTime(FOCMotor *motor)
+void updateMotionControlTime(FOCMotor *motor)
 {
     motor->last_move_time_us = motor->move_time_us;
     updateTime(&(motor->move_time_us), &(motor->last_move_timestamp_us));
 }
 
-static void default_init(FOCMotor *motor)
+void FOCMotor_init(FOCMotor *motor)
 {
 }
 
 /**
     Sensor linking method
 */
-static void default_linkSensor(FOCMotor *motor, Sensor *_sensor)
+void FOCMotor_linkSensor(FOCMotor *motor, Sensor *_sensor)
 {
     motor->sensor = _sensor;
 }
@@ -41,7 +36,7 @@ static void default_linkSensor(FOCMotor *motor, Sensor *_sensor)
 /**
     Driver linking method
 */
-static void default_linkDriver(FOCMotor *motor, FOCDriver *_driver)
+void FOCMotor_linkDriver(FOCMotor *motor, FOCDriver *_driver)
 {
     motor->driver = _driver;
 }
@@ -49,42 +44,42 @@ static void default_linkDriver(FOCMotor *motor, FOCDriver *_driver)
 /**
  CurrentSense linking method
  */
-static void default_linkCurrentSense(FOCMotor *motor, CurrentSense *_current_sense)
+void FOCMotor_linkCurrentSense(FOCMotor *motor, CurrentSense *_current_sense)
 {
     motor->current_sense = _current_sense;
 }
 
 // shaft angle calculation
-static FIXP default_shaftAngle(FOCMotor *motor)
+FIXP FOCMotor_shaftAngle(FOCMotor *motor)
 {
     // if no sensor linked return previous value ( for open loop )
     if (!motor->sensor)
         return motor->shaft_angle;
-    return motor->sensor_direction * motor->sensor->getAngle(motor->sensor) - motor->sensor_offset;
+    return motor->sensor_direction * Sensor_getAngle(motor->sensor) - motor->sensor_offset;
 }
 
 // shaft velocity calculation
-static FIXP default_shaftVelocity(FOCMotor *motor)
+FIXP FOCMotor_shaftVelocity(FOCMotor *motor)
 {
     // if no sensor linked return previous value ( for open loop )
     if (!motor->sensor)
         return motor->shaft_velocity;
-    return motor->sensor_direction * LowPassFilter_update(&motor->LPF_velocity, motor->sensor->getVelocity(motor->sensor));
+    return motor->sensor_direction * LowPassFilter_update(&motor->LPF_velocity, Sensor_getVelocity(motor->sensor));
 }
 
-static FIXP default_electricalAngle(FOCMotor *motor)
+FIXP FOCMotor_electricalAngle(FOCMotor *motor)
 {
     // if no sensor linked return previous value ( for open loop )
     if (!motor->sensor)
         return motor->electrical_angle;
-    return fix_normalize_angle((motor->sensor_direction * motor->pole_pairs) * motor->sensor->getMechanicalAngle(motor->sensor) - motor->zero_electric_angle);
+    return fix_normalize_angle((motor->sensor_direction * motor->pole_pairs) * Sensor_getMechanicalAngle(motor->sensor) - motor->zero_electric_angle);
 }
 
 /**
  *  Monitoring functions
  */
 // function implementing the monitor_port setter
-static void default_useMonitoring(FOCMotor *motor, Print *print)
+void FOCMotor_useMonitoring(FOCMotor *motor, Print *print)
 {
     motor->monitor_port = print; // operate on the address of print
     //   #ifndef TinyFOC_DISABLE_DEBUG
@@ -94,7 +89,7 @@ static void default_useMonitoring(FOCMotor *motor, Print *print)
 }
 
 // Measure resistance and inductance of a motor
-static int default_characteriseMotor(FOCMotor *motor, FIXP voltage, FIXP correction_factor)
+int FOCMotor_characteriseMotor(FOCMotor *motor, FIXP voltage, FIXP correction_factor)
 {
     // TODO
 
@@ -310,12 +305,12 @@ static int default_characteriseMotor(FOCMotor *motor, FIXP voltage, FIXP correct
     // motor->axis_inductance.d = Ld;
     // motor->axis_inductance.q = Lq;
     // motor->phase_inductance = (Ld + Lq) / 2.0f; // FOR BACKWARDS COMPATIBILITY
-    // return 0;
+    return 0;
 }
 
 // utility function intended to be used with serial plotter to monitor motor variables
 // significantly slowing the execution down!!!!
-static void default_monitor(FOCMotor *motor)
+void FOCMotor_monitor(FOCMotor *motor)
 {
     if (!motor->monitor_downsample || motor->monitor_cnt++ < (motor->monitor_downsample - 1))
         return;
@@ -326,14 +321,14 @@ static void default_monitor(FOCMotor *motor)
 
     if (motor->monitor_variables & _MON_TARGET)
     {
-        if (!printed && motor->monitor_start_char)
+        if ((!printed) && motor->monitor_start_char)
             motor->monitor_port->write(motor->monitor_start_char);
         motor->monitor_port->print_f(motor->target, motor->monitor_decimals);
         printed = true;
     }
     if (motor->monitor_variables & _MON_VOLT_Q)
     {
-        if (!printed && motor->monitor_start_char)
+        if ((!printed) && motor->monitor_start_char)
             motor->monitor_port->write(motor->monitor_start_char);
         else if (printed)
             motor->monitor_port->write(motor->monitor_separator);
@@ -342,7 +337,7 @@ static void default_monitor(FOCMotor *motor)
     }
     if (motor->monitor_variables & _MON_VOLT_D)
     {
-        if (!printed && motor->monitor_start_char)
+        if ((!printed) && motor->monitor_start_char)
             motor->monitor_port->write(motor->monitor_start_char);
         else if (printed)
             motor->monitor_port->write(motor->monitor_separator);
@@ -362,7 +357,7 @@ static void default_monitor(FOCMotor *motor)
         }
         if (motor->monitor_variables & _MON_CURR_Q)
         {
-            if (!printed && motor->monitor_start_char)
+            if ((!printed) && motor->monitor_start_char)
                 motor->monitor_port->write(motor->monitor_start_char);
             else if (printed)
                 motor->monitor_port->write(motor->monitor_separator);
@@ -371,7 +366,7 @@ static void default_monitor(FOCMotor *motor)
         }
         if (motor->monitor_variables & _MON_CURR_D)
         {
-            if (!printed && motor->monitor_start_char)
+            if ((!printed) && motor->monitor_start_char)
                 motor->monitor_port->write(motor->monitor_start_char);
             else if (printed)
                 motor->monitor_port->write(motor->monitor_separator);
@@ -382,7 +377,7 @@ static void default_monitor(FOCMotor *motor)
 
     if (motor->monitor_variables & _MON_VEL)
     {
-        if (!printed && motor->monitor_start_char)
+        if ((!printed) && motor->monitor_start_char)
             motor->monitor_port->write(motor->monitor_start_char);
         else if (printed)
             motor->monitor_port->write(motor->monitor_separator);
@@ -391,7 +386,7 @@ static void default_monitor(FOCMotor *motor)
     }
     if (motor->monitor_variables & _MON_ANGLE)
     {
-        if (!printed && motor->monitor_start_char)
+        if ((!printed) && motor->monitor_start_char)
             motor->monitor_port->write(motor->monitor_start_char);
         else if (printed)
             motor->monitor_port->write(motor->monitor_separator);
@@ -601,7 +596,7 @@ int FOCMotor_tuneCurrentController(FOCMotor *motor, FIXP bandwidth)
     {
         // need motor parameters to tune the controller
         TinyFOC_MOTOR_WARN("Motor params missing!");
-        if (motor->characteriseMotor(motor, motor->voltage_sensor_align, FIX_FROM_FLOAT(1.5f)))
+        if (FOCMotor_characteriseMotor(motor, motor->voltage_sensor_align, FIX_FROM_FLOAT(1.5f)))
         {
             return 3;
         }
@@ -631,10 +626,10 @@ int FOCMotor_tuneCurrentController(FOCMotor *motor, FIXP bandwidth)
 
 // Iterative function looping FOC algorithm, setting Uq on the Motor
 // The faster it can be run the better
-static void default_loopFOC(FOCMotor *motor)
+void FOCMotor_loopFOC(FOCMotor *motor)
 {
     if (motor->motion_cnt++ > motor->motion_downsample)
-        motor->move(motor, NOT_SET);
+        FOCMotor_move(motor, NOT_SET);
 
     // update loop time measurement
     updateLoopFOCTime(motor);
@@ -646,7 +641,7 @@ static void default_loopFOC(FOCMotor *motor)
     // update sensor - do this even in open-loop mode, as user may be switching between modes and we could lose track
     //                 of full rotations otherwise.
     if (motor->sensor)
-        motor->sensor->update(motor->sensor);
+        Sensor_update(motor->sensor);
 
     // if disabled do nothing
     if (!motor->enabled)
@@ -660,7 +655,7 @@ static void default_loopFOC(FOCMotor *motor)
         // Needs the update() to be called first
         // This function will not have numerical issues because it uses Sensor::getMechanicalAngle()
         // which is in range 0-2PI
-        motor->electrical_angle = motor->electricalAngle(motor);
+        motor->electrical_angle = FOCMotor_electricalAngle(motor);
 
     switch (motor->torque_controller)
     {
@@ -675,7 +670,7 @@ static void default_loopFOC(FOCMotor *motor)
         motor->current_sp = _constrain(motor->current_sp, -motor->current_limit, motor->current_limit) + motor->feed_forward_current.q; // desired current is the setpoint
         // calculate the back-emf voltage if KV_rating available U_bemf = vel*(1/KV)
         if (_isset(motor->KV_rating))
-            motor->voltage_bemf = motor->estimateBEMF(motor, motor->shaft_velocity);
+            motor->voltage_bemf = FOCMotor_estimateBEMF(motor, motor->shaft_velocity);
         // filter the value values
         motor->current.q = LowPassFilter_update(&(motor->LPF_current_q), motor->current_sp);
         // calculate the phase voltage
@@ -694,7 +689,7 @@ static void default_loopFOC(FOCMotor *motor)
         // constrain current setpoint
         motor->current_sp = _constrain(motor->current_sp, -motor->current_limit, motor->current_limit) + motor->feed_forward_current.q;
         // read overall current magnitude
-        motor->current.q = motor->current_sense->getDCCurrent(motor->current_sense, motor->electrical_angle);
+        motor->current.q = CurrentSense_getDCCurrent(motor->current_sense, motor->electrical_angle);
         // filter the value values
         motor->current.q = LowPassFilter_update(&(motor->LPF_current_q), motor->current.q);
         // calculate the phase voltage
@@ -734,7 +729,7 @@ static void default_loopFOC(FOCMotor *motor)
         break;
     }
     // set the phase voltage - FOC heart function :)
-    motor->setPhaseVoltage(motor, motor->voltage.q, motor->voltage.d, motor->electrical_angle);
+    FOCMotor_setPhaseVoltage(motor, motor->voltage.q, motor->voltage.d, motor->electrical_angle);
 }
 
 // Iterative function running outer loop of the FOC algorithm
@@ -742,7 +737,7 @@ static void default_loopFOC(FOCMotor *motor)
 // It runs either angle, velocity or voltage loop
 // - needs to be called iteratively it is asynchronous function
 // - if target is not set it uses motor.target value
-static void default_move(FOCMotor *motor, FIXP new_target)
+void FOCMotor_move(FOCMotor *motor, FIXP new_target)
 {
     motor->motion_cnt = 1;
 
@@ -772,8 +767,8 @@ static void default_move(FOCMotor *motor, FIXP new_target)
     {
         // read the values only if the motor is not in open loop
         // because in open loop the shaft angle/velocity is updated within angle/velocityOpenLoop functions
-        motor->shaft_angle = motor->shaftAngle(motor);
-        motor->shaft_velocity = motor->shaftVelocity(motor);
+        motor->shaft_angle = FOCMotor_shaftAngle(motor);
+        motor->shaft_velocity = FOCMotor_shaftVelocity(motor);
     }
 
     // if disabled do nothing
@@ -837,14 +832,12 @@ static void default_move(FOCMotor *motor, FIXP new_target)
         // custom control - user provides the function that calculates the current_sp
         // based on the target value and the motor state
         // user makes sure to use it with appropriate torque control mode
-        if (motor->customMotionControlCallback)
-            motor->current_sp = motor->customMotionControlCallback(motor);
         break;
     }
 }
 
 // FOC initialization function
-static int default_initFOC(FOCMotor *motor)
+int FOCMotor_initFOC(FOCMotor *motor)
 {
     int exit_flag = 1;
 
@@ -858,8 +851,8 @@ static int default_initFOC(FOCMotor *motor)
     {
         exit_flag *= FOCMotor_alignSensor(motor);
         // added the shaft_angle update
-        motor->sensor->update(motor->sensor);
-        motor->shaft_angle = motor->shaftAngle(motor);
+        Sensor_update(motor->sensor);
+        motor->shaft_angle = FOCMotor_shaftAngle(motor);
     }
     else
     {
@@ -908,7 +901,7 @@ static int default_initFOC(FOCMotor *motor)
     {
         TinyFOC_MOTOR_ERROR("Init FOC fail");
         motor->motor_status = FOCMotorStatus_calib_failed;
-        motor->disable(motor);
+        FOCMotor_disable(motor);
     }
 
     return exit_flag;
@@ -922,7 +915,7 @@ int FOCMotor_alignCurrentSense(FOCMotor *motor)
     TinyFOC_MOTOR_DEBUG("Align current sense.");
 
     // align current sense and the driver
-    exit_flag = motor->current_sense->driverAlign(motor->current_sense, motor->voltage_sensor_align, motor->modulation_centered);
+    exit_flag = CurrentSense_driverAlign(motor->current_sense, motor->voltage_sensor_align, motor->modulation_centered);
     if (!exit_flag)
     {
         // error in current sense - phase either not measured or bad connection
@@ -951,7 +944,7 @@ FIXP FOCMotor_findBestOffset(FOCMotor *motor, FIXP voltage_align, FIXP min_offs,
     FIXP curr_angle;
     for (size_t i = 0; i < 8; i++)
     {
-        motor->setPhaseVoltage(motor, 0, 0, 0);
+        FOCMotor_setPhaseVoltage(motor, 0, 0, 0);
         _delay(1000); // wait for stop
         lastMicros = _micros();
         dt = _micros() - lastMicros;
@@ -959,31 +952,31 @@ FIXP FOCMotor_findBestOffset(FOCMotor *motor, FIXP voltage_align, FIXP min_offs,
         while (dt < 2000000) // wait 2 seconds for the movement to stabilize and be visible on the sensor
         {
             dt = _micros() - lastMicros;
-            curr_angle = motor->electricalAngle(motor);
-            motor->setPhaseVoltage(motor, voltage_align, 0, curr_angle);
-            motor->sensor->update(motor->sensor);
+            curr_angle = FOCMotor_electricalAngle(motor);
+            FOCMotor_setPhaseVoltage(motor, voltage_align, 0, curr_angle);
+            Sensor_update(motor->sensor);
             _delay_us(500);
         }
 
-        vel_tmp_fwd = motor->shaftVelocity(motor);
+        vel_tmp_fwd = FOCMotor_shaftVelocity(motor);
 
-        motor->setPhaseVoltage(motor, 0, 0, 0);
+        FOCMotor_setPhaseVoltage(motor, 0, 0, 0);
         _delay(1000);
         lastMicros = _micros();
         dt = _micros() - lastMicros;
         while (dt < 2000000) // wait 2 seconds for the movement to stabilize and be visible on the sensor
         {
             dt = _micros() - lastMicros;
-            curr_angle = motor->electricalAngle(motor);
-            motor->setPhaseVoltage(motor, -voltage_align, 0, curr_angle);
-            motor->sensor->update(motor->sensor);
+            curr_angle = FOCMotor_electricalAngle(motor);
+            FOCMotor_setPhaseVoltage(motor, -voltage_align, 0, curr_angle);
+            Sensor_update(motor->sensor);
             _delay_us(500);
         }
 
-        vel_tmp_rev = motor->shaftVelocity(motor);
+        vel_tmp_rev = FOCMotor_shaftVelocity(motor);
 
         FIXP cmpval = 0;
-        if(strategy == STRATEGY_MAX_VEL)
+        if (strategy == STRATEGY_MAX_VEL)
         {
             cmpval = vel_tmp_fwd - vel_tmp_rev;
             if (cmpval > best_vel || !_isset(best_vel))
@@ -994,8 +987,8 @@ FIXP FOCMotor_findBestOffset(FOCMotor *motor, FIXP voltage_align, FIXP min_offs,
                 TinyFOCDebug_println_f("VREV", vel_tmp_rev);
                 TinyFOCDebug_println_i("Best index: ", i);
             }
-        }            
-        else if(strategy == STRATEGY_MIN_DIFF)
+        }
+        else if (strategy == STRATEGY_MIN_DIFF)
         {
             cmpval = _abs(vel_tmp_fwd + vel_tmp_rev);
             if (cmpval < best_vel || !_isset(best_vel))
@@ -1007,8 +1000,6 @@ FIXP FOCMotor_findBestOffset(FOCMotor *motor, FIXP voltage_align, FIXP min_offs,
                 TinyFOCDebug_println_i("Best index: ", i);
             }
         }
-
-        
     }
     return best_offset;
 }
@@ -1020,7 +1011,7 @@ int FOCMotor_alignSensor(FOCMotor *motor)
     TinyFOC_MOTOR_DEBUG("Align sensor.");
 
     // check if sensor needs zero search
-    if (motor->sensor->needsSearch(motor->sensor))
+    if (Sensor_needsSearch(motor->sensor))
         exit_flag = FOCMotor_absoluteZeroSearch(motor);
     // stop init if not found index
     if (!exit_flag)
@@ -1038,23 +1029,23 @@ int FOCMotor_alignSensor(FOCMotor *motor)
         for (int i = 0; i <= 500; i++)
         {
             FIXP angle = FIX_PI_2 + FIX_MUL_DIV_INT(FIX_2PI, i, 500);
-            motor->setPhaseVoltage(motor, voltage_align, 0, angle);
-            motor->sensor->update(motor->sensor);
+            FOCMotor_setPhaseVoltage(motor, voltage_align, 0, angle);
+            Sensor_update(motor->sensor);
             _delay(2);
         }
         // take and angle in the middle
-        motor->sensor->update(motor->sensor);
-        FIXP mid_angle = motor->sensor->getAngle(motor->sensor);
+        Sensor_update(motor->sensor);
+        FIXP mid_angle = Sensor_getAngle(motor->sensor);
         // move one electrical revolution backwards
         for (int i = 500; i >= 0; i--)
         {
             FIXP angle = FIX_PI_2 + FIX_MUL_DIV_INT(FIX_2PI, i, 500);
-            motor->setPhaseVoltage(motor, voltage_align, 0, angle);
-            motor->sensor->update(motor->sensor);
+            FOCMotor_setPhaseVoltage(motor, voltage_align, 0, angle);
+            Sensor_update(motor->sensor);
             _delay(2);
         }
-        motor->sensor->update(motor->sensor);
-        FIXP end_angle = motor->sensor->getAngle(motor->sensor);
+        Sensor_update(motor->sensor);
+        FIXP end_angle = Sensor_getAngle(motor->sensor);
         // setPhaseVoltage(0, 0, 0);
         _delay(200);
         // determine the direction the sensor moved
@@ -1088,7 +1079,7 @@ int FOCMotor_alignSensor(FOCMotor *motor)
             _delay(20);
             TinyFOC_MOTOR_DEBUG("Zero elec. angle: ", motor->zero_electric_angle);
             // stop everything
-            motor->setPhaseVoltage(motor, 0, 0, 0);
+            FOCMotor_setPhaseVoltage(motor, 0, 0, 0);
             _delay(200);
         }
         else
@@ -1128,22 +1119,22 @@ int FOCMotor_absoluteZeroSearch(FOCMotor *motor)
     motor->velocity_limit = motor->velocity_index_search;
     motor->voltage_limit = motor->voltage_sensor_align;
     motor->shaft_angle = 0;
-    while (motor->sensor->needsSearch(motor->sensor) && motor->shaft_angle < FIX_2PI)
+    while (Sensor_needsSearch(motor->sensor) && motor->shaft_angle < FIX_2PI)
     {
         FOCMotor_angleOpenloop(motor, 1.5f * _2PI);
         // call important for some sensors not to loose count
         // not needed for the search
-        motor->sensor->update(motor->sensor);
+        Sensor_update(motor->sensor);
     }
     // disable motor
-    motor->setPhaseVoltage(motor, 0, 0, 0);
+    FOCMotor_setPhaseVoltage(motor, 0, 0, 0);
     // reinit the limits
     motor->velocity_limit = limit_vel;
     motor->voltage_limit = limit_volt;
     // check if the zero found
     if (motor->monitor_port)
     {
-        if (motor->sensor->needsSearch(motor->sensor))
+        if (Sensor_needsSearch(motor->sensor))
         {
             TinyFOC_MOTOR_ERROR("Not found!");
         }
@@ -1152,7 +1143,7 @@ int FOCMotor_absoluteZeroSearch(FOCMotor *motor)
             TinyFOC_MOTOR_DEBUG("Success!");
         }
     }
-    return !motor->sensor->needsSearch(motor->sensor);
+    return !Sensor_needsSearch(motor->sensor);
 }
 
 void FOCMotor_load_default(FOCMotor *motor)
@@ -1229,18 +1220,20 @@ void FOCMotor_load_default(FOCMotor *motor)
     LowPassFilter_init(&motor->LPF_velocity, DEF_VEL_FILTER_Tf, NOT_SET);
     LowPassFilter_init(&motor->LPF_angle, 0.0f, NOT_SET);
 
-    // default implementation
-    motor->init = default_init;
-    motor->linkSensor = default_linkSensor;
-    motor->linkCurrentSense = default_linkCurrentSense;
-    motor->linkDriver = default_linkDriver;
-    motor->shaftAngle = default_shaftAngle;
-    motor->shaftVelocity = default_shaftVelocity;
-    motor->electricalAngle = default_electricalAngle;
-    motor->useMonitoring = default_useMonitoring;
-    motor->characteriseMotor = default_characteriseMotor;
-    motor->monitor = default_monitor;
-    motor->loopFOC = default_loopFOC;
-    motor->initFOC = default_initFOC;
-    motor->move = default_move;
+#if (MOTOR_TYPE == BLDC)
+    // save pole pairs number
+    motor->pole_pairs = NOT_SET;
+    // save phase resistance number
+    motor->phase_resistance = NOT_SET;
+    // save back emf constant KV = 1/KV
+    // 1/sqrt(3) - rms value
+    motor->KV_rating = NOT_SET;
+    // save phase inductance
+    motor->axis_inductance.d = NOT_SET;
+    motor->axis_inductance.q = NOT_SET;
+    motor->phase_inductance = NOT_SET; // FOR BACKWARDS COMPATIBILITY
+
+    // torque control type is voltage by default
+    motor->torque_controller = TorqueControlType_voltage;
+#endif
 }

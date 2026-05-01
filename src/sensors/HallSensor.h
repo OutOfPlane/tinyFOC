@@ -1,7 +1,7 @@
 #ifndef HALL_SENSOR_LIB_H
 #define HALL_SENSOR_LIB_H
 
-#include "../common/base/Sensor.h"
+#include "../common/Sensor.h"
 #include "../common/foc_utils.h"
 #include "../common/time_utils.h"
 #include "../common/lowpass_filter.h"

@@ -111,8 +111,8 @@ void loop() {
 
 #include "BLDCMotor.h"
 #include "sensors/HallSensor.h"
-#include "common/base/CurrentSense.h"
-#include "common/base/FOCDriver.h"
+#include "common/CurrentSense.h"
+#include "common/FOCDriver.h"
 #include "communication/TinyFOCDebug.h"
 
 #endif
