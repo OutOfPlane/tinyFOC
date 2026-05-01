@@ -80,7 +80,7 @@ typedef struct{
     void (*write)(char val);
     void (*newline)(void);
     void (*print)(char* msg);
-    void (*print_f)(FIXP val, int digits) __reentrant;
+    void (*print_f)(FIXP val, int digits);
     int (*read)(char* val, int len);
 }Print;
 

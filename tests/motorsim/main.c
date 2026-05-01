@@ -75,7 +75,7 @@ BLDCConfig mybldc_config = {
     .sensor_offset = 0
 };
 
-HallSensor mysensor;
+Sensor mysensor;
 FOCMotor mymotor;
 CurrentSense mycs;
 FOCDriver mydriver;
@@ -147,7 +147,7 @@ void update_motor(BLDCConfig* cfg, BLDCState* state, float v_a, float v_b, float
 }
 
 
-uint32_t mymicros()
+uint32_t _micros()
 {
     cmicros ++;
 
@@ -159,8 +159,10 @@ uint32_t mymicros()
     return cmicros;
 }
 
-void setPWM(FOCDriver_ll *driver, FIXP dcA, FIXP dcB, FIXP dcC) {
-    BLDCState* state = (BLDCState*)driver->param;
+
+//low level driver implementations - these would normally interface with hardware, but here we simulate them using the BLDCState structure
+void FOCDriver_ll_setPwm(void *params, FIXP dcA, FIXP dcB, FIXP dcC) {
+    BLDCState* state = (BLDCState*)params;
     state->voltage_a = FIX_TO_FLOAT(dcA) *DEF_POWER_SUPPLY;
     state->voltage_b = FIX_TO_FLOAT(dcB) *DEF_POWER_SUPPLY;
     state->voltage_c = FIX_TO_FLOAT(dcC) *DEF_POWER_SUPPLY;
@@ -168,9 +170,24 @@ void setPWM(FOCDriver_ll *driver, FIXP dcA, FIXP dcB, FIXP dcC) {
     _micros();
 }
 
-uint8_t get_hall_state(HallSensor_ll *ll) {
-    BLDCState* state = (BLDCState*)ll->param;
+bool FOCDriver_ll_init(void *params){
+    return true;
+}
+
+void FOCDriver_ll_enable(void *params)
+{}
+
+void FOCDriver_ll_disable(void *params)
+{}
+
+void Sensor_ll_init(void *param)
+{}
+
+void Sensor_ll_read(void *param)
+{
+    BLDCState* state = &mybldc;
     BLDCConfig* cfg = &mybldc_config;
+    Sensor* sns = (Sensor*)param;
 
     float ele_angle = fmodf(state->angle * cfg->pole_pairs + cfg->sensor_offset, 2.0f * M_PI);
     if (ele_angle < 0) ele_angle += 2.0f * M_PI;
@@ -179,50 +196,26 @@ uint8_t get_hall_state(HallSensor_ll *ll) {
     int h2 = (ele_angle > 2.0f * M_PI / 3.0f && ele_angle < 5.0f * M_PI / 3.0f) ? 1 : 0;
     int h3 = (ele_angle > 4.0f * M_PI / 3.0f || ele_angle < M_PI / 3.0f) ? 1 : 0;
 
-    return (h1 << 2) | (h2 << 1) | h3;
-}
-
-void readCurrents(CurrentSense_ll *ll, FIXP* i_a, FIXP* i_b, FIXP* i_c) {
-    BLDCState* state = (BLDCState*)ll->param;
-    *i_a = FIX_FROM_FLOAT(state->current_a);
-    *i_b = FIX_FROM_FLOAT(state->current_b);
-    *i_c = FIX_FROM_FLOAT(state->current_c);
-}
-
-void noop(void *np){
+    sns->new_hall_state = (h1 << 2) | (h2 << 1) | h3;
 
 }
 
-HallSensor_ll hall_ll = {
-    .init = noop,
-    .read = get_hall_state,
-    .initOK = true,
-    .param = &mybldc
-};
 
-FOCDriver_ll foc_ll = {
-    .init = noop,
-    .enable = noop,
-    .disable = noop,
-    .dcA = 0.0f,
-    .dcB = 0.0f,
-    .dcC = 0.0f,
-    .initOK = true,
-    .param = &mybldc,
-    .setpwm = setPWM
-};
+bool CurrentSense_ll_init(void *param)
+{ return true;}
 
-CurrentSense_ll cs_ll = {
-    .init = noop,
-    .readcurrents = readCurrents,
-    .initOK = true,
-    .param = &mybldc
-};
+void CurrentSense_ll_readcurrents(void *params, FIXP *phA, FIXP *phB, FIXP *phC)
+{
+    BLDCState* state = (BLDCState*)params;
+    *phA = FIX_FROM_FLOAT(state->current_a);
+    *phB = FIX_FROM_FLOAT(state->current_b);
+    *phC = FIX_FROM_FLOAT(state->current_c);
+}
+
 
 
 int main(void)
 {
-    _micros = mymicros;
     Print myprint = {
         .newline = nl,
         .print = p,
@@ -240,7 +233,7 @@ int main(void)
     printf("MyMicros: %lu\r\n", _micros());
 
     
-    BLDCMotor_load_default(&mymotor);
+    FOCMotor_load_default(&mymotor);
     mymotor.pole_pairs = mybldc_config.pole_pairs;
     mymotor.KV_rating = FIX_FROM_FLOAT(mybldc_config.kv);
     mymotor.axis_inductance.d = FIX_FROM_FLOAT(mybldc_config.L);
@@ -248,45 +241,45 @@ int main(void)
     mymotor.phase_resistance = FIX_FROM_FLOAT(mybldc_config.R);
 
     FOCDriver_load_default(&mydriver);
-    mydriver.ll = &foc_ll;
+    mydriver.params = &mybldc;
     
     CurrentSense_load_default(&mycs);
-    mycs.ll = &cs_ll;
+    mycs.params = &mybldc;
     CurrentSense_linkDriver(&mycs, &mydriver);
     
 
     
-    HallSensor_load_default(&mysensor);
-    mysensor.ll = &hall_ll;
+    Sensor_load_default(&mysensor);
     mysensor.pp = mymotor.pole_pairs;
+    mysensor.params = &mysensor;
 
-    mymotor.linkCurrentSense(&mymotor, &mycs);
-    mymotor.linkDriver(&mymotor, &mydriver);
-    mymotor.linkSensor(&mymotor, &mysensor.sensor);
+    FOCMotor_linkCurrentSense(&mymotor, &mycs);
+    FOCMotor_linkDriver(&mymotor, &mydriver);
+    FOCMotor_linkSensor(&mymotor, &mysensor);
     mymotor.sensor_direction = Direction_UNKNOWN;
     mymotor.zero_electric_angle = NOT_SET;
     mymotor.controller = MotionControlType_velocity;
     mymotor.torque_controller = TorqueControlType_voltage;
 
-    mysensor.sensor.init(&mysensor.sensor);
-    mydriver.init(&mydriver);
-    mymotor.init(&mymotor);
-    mycs.init(&mycs);
+    Sensor_init(&mysensor);
+    FOCDriver_init(&mydriver);
+    FOCMotor_init(&mymotor);
+    CurrentSense_init(&mycs);
     FOCMotor_updateVoltageLimit(&mymotor, FIX_FROM_FLOAT(8.0f));
     FOCMotor_updateVelocityLimit(&mymotor, FIX_FROM_FLOAT(100.0f));
-    mymotor.initFOC(&mymotor);
+    FOCMotor_initFOC(&mymotor);
 
-    mymotor.move(&mymotor, FIX_FROM_FLOAT(15.0f)); // Move to 20 rad/s
+    FOCMotor_move(&mymotor, FIX_FROM_FLOAT(15.0f)); // Move to 20 rad/s
 
     for(int i = 0; i < 2000; i++){
-        mymotor.loopFOC(&mymotor);
+        FOCMotor_loopFOC(&mymotor);
         _delay(1);
     }
 
-    mymotor.move(&mymotor, FIX_FROM_FLOAT(-15.0f)); // Move to 20 rad/s
+    FOCMotor_move(&mymotor, FIX_FROM_FLOAT(-15.0f)); // Move to 20 rad/s
 
     for(int i = 0; i < 2000; i++){
-        mymotor.loopFOC(&mymotor);
+        FOCMotor_loopFOC(&mymotor);
         _delay(1);
     }
 

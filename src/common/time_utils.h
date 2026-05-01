@@ -18,7 +18,7 @@ void _delay_us(uint32_t us);
  * Function implementing timestamp getting function in microseconds
  * hardware specific
  */
-uint32_t (*_micros)(void);
+uint32_t _micros(void);
 
 
 #endif

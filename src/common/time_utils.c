@@ -16,11 +16,3 @@ void _delay_us(uint32_t us)
   while( _micros() - t < us ); 
 }
 
-// function buffering _micros() 
-// arduino function doesn't work well with interrupts
-static uint32_t default_micros(){
-  return 0;
-}
-
-
-uint32_t (*_micros)(void) = default_micros;

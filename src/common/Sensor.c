@@ -2,6 +2,7 @@
 #include "time_utils.h"
 
 
+#ifndef SENSOR_TYPE
 
 void Sensor_update(Sensor *sns) {
     FIXP val = Sensor_getSensorAngle(sns);
@@ -48,7 +49,6 @@ FIXP Sensor_getVelocity(Sensor *sns) {
 }
 
 
-
 void Sensor_init(Sensor *sns) {
     // initialize all the internal variables of Sensor to ensure a "smooth" startup (without a 'jump' from zero)
     Sensor_getSensorAngle(sns); // call once
@@ -61,6 +61,7 @@ void Sensor_init(Sensor *sns) {
     sns->angle_prev = Sensor_getSensorAngle(sns); // call again
     sns->angle_prev_ts = _micros();
 }
+#endif
 
 
 FIXP default_getMechanicalAngle(Sensor *sns) {
@@ -101,4 +102,17 @@ void Sensor_load_default(Sensor *sns)
     sns->vel_angle_prev = 0;
     sns->full_rotations = 0;
     sns->vel_full_rotations = 0;
+    sns->params = NULL;
+
+    #if(SENSOR_TYPE == HallSensor)
+    sns->hall_state = 0;
+    sns->direction = Direction_UNKNOWN;
+    sns->old_direction = Direction_UNKNOWN;
+    sns->electric_sector = 0;
+    sns->pulse_timestamp = 0;
+    sns->total_interrupts = 0;
+    sns->velocity_max = 1000; // default max velocity of 1000 rad
+    sns->angle_cache = 0;
+    sns->newpulse = 0;
+    #endif
 }

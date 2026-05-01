@@ -1,4 +1,5 @@
 #include "lowpass_filter.h"
+#include "time_utils.h"
 
 void LowPassFilter_init(LowPassFilter *lpf, uint32_t time_constant_us, uint32_t sampling_time_us)
 {

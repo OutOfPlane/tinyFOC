@@ -109,10 +109,10 @@ void loop() {
 #ifndef TinyFOC_H
 #define TinyFOC_H
 
-#include "BLDCMotor.h"
-#include "sensors/HallSensor.h"
 #include "common/CurrentSense.h"
 #include "common/FOCDriver.h"
+#include "common/FOCMotor.h"
+#include "common/Sensor.h"
 #include "communication/TinyFOCDebug.h"
 
 #endif

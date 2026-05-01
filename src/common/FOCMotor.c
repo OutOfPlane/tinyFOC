@@ -1,4 +1,5 @@
 #include "common/FOCMotor.h"
+#include "time_utils.h"
 
 // time measuring function
 // It filters the value using low pass filtering alpha = 0.1
@@ -21,9 +22,12 @@ void updateMotionControlTime(FOCMotor *motor)
     updateTime(&(motor->move_time_us), &(motor->last_move_timestamp_us));
 }
 
+#ifndef MOTOR_TYPE
 void FOCMotor_init(FOCMotor *motor)
 {
 }
+
+#endif
 
 /**
     Sensor linking method

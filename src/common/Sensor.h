@@ -65,6 +65,7 @@ typedef struct s_Sensor
 
     // the current 3bit state of the hall sensors
     volatile uint8_t hall_state;
+    volatile uint8_t new_hall_state;
     // the current sector of the sensor. Each sector is 60deg electrical
     volatile int8_t electric_sector;
     // the number of electric rotations

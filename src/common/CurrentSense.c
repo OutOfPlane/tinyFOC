@@ -1,6 +1,7 @@
 #include "CurrentSense.h"
-#include "../communication/TinyFOCDebug.h"
+#include "communication/TinyFOCDebug.h"
 #include <stdint.h>
+#include "time_utils.h"
 
 // get current magnitude
 //   - absolute  - if no electrical_angle provided
@@ -204,7 +205,7 @@ void CurrentSense_linkDriver(CurrentSense *cs, FOCDriver *_driver)
 {
     cs->driver = _driver;
     // save the driver type for easier access
-    cs->driver_type = cs->driver->type(cs->driver);
+    cs->driver_type = FOCDriver_type(cs->driver);
 }
 
 // Helper function to read and average phase currents
