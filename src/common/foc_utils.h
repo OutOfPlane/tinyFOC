@@ -15,7 +15,6 @@
 #define _constrain(amt,low,high) ((amt)<(low)?(low):((amt)>(high)?(high):(amt)))
 #define _sqrt(a) (_sqrtApprox(a))
 #define _isset(a) ( (a) != (NOT_SET) )
-#define _UNUSED(v) (void) (v)
 #define _powtwo(x) (1 << (x))
 
 #define _swap(a, b) { auto temp = a; a = b; b = temp; }
@@ -40,6 +39,8 @@
 #define _HIGH_Z _HIGH_IMPEDANCE
 #define _ACTIVE 1
 #define _NC ((int) NOT_SET)
+
+#define UNUSED(x) (void)x
 
 // dq variables
 struct DQ_s
@@ -76,12 +77,11 @@ typedef struct Phase_s PhaseCurrent_s;
 #define max(X, Y) (X > Y ? X : Y)
 #define _abs(X) (X > 0 ? X : -X)
 
-typedef struct{
-    void (*write)(char val);
-    void (*newline)(void);
-    void (*print)(char* msg);
-    void (*print_f)(FIXP val, int digits);
-    int (*read)(char* val, int len);
-}Print;
+
+void dbg_write(char val);
+void dbg_newline(void);
+void dbg_print(char* msg);
+void dbg_print_f(FIXP val, int digits);
+int dbg_read(char* val, int len);
 
 #endif

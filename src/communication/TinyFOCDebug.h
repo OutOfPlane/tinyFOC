@@ -35,7 +35,6 @@
 
 #ifndef TinyFOC_DISABLE_DEBUG 
 
-void TinyFOCDebug_enable(Print* debugPrint);
 void TinyFOCDebug_println_s(char* msg);
 void TinyFOCDebug_println_f(char *msg, FIXP val);
 void TinyFOCDebug_println_i(char *msg, int val);

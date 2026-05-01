@@ -1,39 +1,25 @@
 
 #include "TinyFOCDebug.h"
-#ifndef TinyFOC_DISABLE_DEBUG
+#ifdef DEBUG_PRINT
 
-
-Print* _debugPrint = NULL;
-
-
-void TinyFOCDebug_enable(Print* debugPrint) {
-    _debugPrint = debugPrint;
-}
-
-
-void TinyFOCDebug_println_s(char* val) {
-    if (_debugPrint != NULL) {
-        _debugPrint->print(val);
-        _debugPrint->newline();
-    }
+void TinyFOCDebug_println_s(char *val)
+{
+    dbg_print(val);
+    dbg_newline();
 }
 
 void TinyFOCDebug_println_f(char *msg, FIXP val)
 {
-    if (_debugPrint != NULL) {
-        _debugPrint->print(msg);
-        _debugPrint->print_f(val, 4); // default to 4 decimal places
-        _debugPrint->newline();
-    }
+    dbg_print(msg);
+    dbg_print_f(val, 4); // default to 4 decimal places
+    dbg_newline();
 }
 
 void TinyFOCDebug_println_i(char *msg, int val)
 {
-    if (_debugPrint != NULL) {
-        _debugPrint->print(msg);
-        _debugPrint->print_f(FIX_FROM_INT(val), 4); // default to 4 decimal places
-        _debugPrint->newline();
-    }
+    dbg_print(msg);
+    dbg_print_f(FIX_FROM_INT(val), 4); // default to 4 decimal places
+    dbg_newline();
 }
 
 void TinyFOCDebug_println_c(char *msg, char val)

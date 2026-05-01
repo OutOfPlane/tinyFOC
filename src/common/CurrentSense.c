@@ -33,10 +33,12 @@ FIXP CurrentSense_getDCCurrent(CurrentSense *cs, FIXP motor_electrical_angle)
 }
 
 void CurrentSense_enable(CurrentSense *cs) {
+    UNUSED(cs);
     // nothing is done here, but you can override this function
 }
 
 void CurrentSense_disable(CurrentSense *cs) {
+    UNUSED(cs);
     // nothing is done here, but you can override this function
 }
 

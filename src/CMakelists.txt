@@ -13,6 +13,22 @@ add_library(tinyfoc
     sensors/HallSensor.c
     )
 
+find_file(TINYFOC_CONFIG_HEADER
+    NAMES tinyfoc_conf.h
+    # Search in the main project's source and include dirs
+    PATHS "${CMAKE_SOURCE_DIR}" "${CMAKE_SOURCE_DIR}/src" "${CMAKE_SOURCE_DIR}/include" "${CMAKE_SOURCE_DIR}/inc"
+    # Prevents searching system paths like /usr/include
+    NO_DEFAULT_PATH 
+)
+
+if(APP_CONFIG_HEADER)
+    get_filename_component(CONFIG_DIR "${APP_CONFIG_HEADER}" DIRECTORY)
+    target_include_directories(tinyfoc PUBLIC "${CONFIG_DIR}")
+else()
+    message(WARNING "tinyfoc_conf.h not found. Using default library settings.")
+    target_include_directories(tinyfoc PUBLIC default_config)
+endif()
+
 # Tell CMake where the header files are for this library
 target_include_directories(tinyfoc PUBLIC 
     common
@@ -20,3 +36,13 @@ target_include_directories(tinyfoc PUBLIC
     sensors
     .
     )
+
+target_compile_options(tinyfoc PRIVATE
+    "--model-large"
+    "--stack-auto"
+    "--opt-code-size"
+    "-mstm8"
+    "--std-c99"
+    "--nolospre"
+    "--int-long-reent"
+)

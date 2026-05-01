@@ -1,13 +1,13 @@
 #include "pid.h"
 #include "time_utils.h"
 
-void PIDController_init(PIDController *pid, FIXP P, FIXP I, FIXP D, FIXP ramp, FIXP limit, uint32_t sampling_time)
+void PIDController_init(PIDController *pid, FIXP P, FIXP I, FIXP D, FIXP ramp, FIXP output_max, uint32_t sampling_time)
 {
     pid->P = P;
     pid->I = I;
     pid->D = D;
     pid->output_ramp = ramp;
-    pid->limit = limit;
+    pid->output_max = output_max;
     pid->Ts = sampling_time;
     
     pid->integral_prev = 0;
@@ -41,7 +41,7 @@ FIXP PIDController_update(PIDController *pid, FIXP error){
     FIXP integral_increment = FIX_MUL(FIX_MUL_DIV_INT(pid->I, half_dt, us_per_s), error_sum);
     FIXP integral = pid->integral_prev + integral_increment;
     // antiwindup - limit the output
-    if(pid->limit != NOT_SET) integral = FIX_CONSTRAIN(integral, -pid->limit, pid->limit);
+    if(pid->output_max != NOT_SET) integral = FIX_CONSTRAIN(integral, -pid->output_max, pid->output_max);
     // Discrete derivation
     // u_dk = D(ek - ek_1)/Ts
     FIXP error_diff = error - pid->error_prev;
@@ -50,7 +50,7 @@ FIXP PIDController_update(PIDController *pid, FIXP error){
     // sum all the components
     FIXP output = proportional + integral + derivative;
     // antiwindup - limit the output variable
-    if(pid->limit != NOT_SET) output = FIX_CONSTRAIN(output, -pid->limit, pid->limit);
+    if(pid->output_max != NOT_SET) output = FIX_CONSTRAIN(output, -pid->output_max, pid->output_max);
 
     // if output ramp defined
     if(pid->output_ramp != NOT_SET && pid->output_ramp > 0){

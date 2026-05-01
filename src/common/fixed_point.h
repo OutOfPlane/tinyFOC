@@ -25,7 +25,7 @@
 #define us_per_s 1000000
 
 // Arithmetic operations
-#define FIX_MUL(a, b) ((DFIXP)(a) * (b) >> FIX_SHIFT)
+#define FIX_MUL(a, b) (((DFIXP)(a) * (b)) >> FIX_SHIFT)
 #define FIX_MUL_DIV_INT(a, b, c) (((DFIXP)(a) * (b)) / (c))
 #define FIX_DIV(a, b) ((((DFIXP)(a)) << FIX_SHIFT) / (b))
 #define FIX_ADD(a, b) ((a) + (b))

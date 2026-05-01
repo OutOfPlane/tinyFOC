@@ -79,19 +79,6 @@ FIXP FOCMotor_electricalAngle(FOCMotor *motor)
     return fix_normalize_angle((motor->sensor_direction * motor->pole_pairs) * Sensor_getMechanicalAngle(motor->sensor) - motor->zero_electric_angle);
 }
 
-/**
- *  Monitoring functions
- */
-// function implementing the monitor_port setter
-void FOCMotor_useMonitoring(FOCMotor *motor, Print *print)
-{
-    motor->monitor_port = print; // operate on the address of print
-    //   #ifndef TinyFOC_DISABLE_DEBUG
-    //   TinyFOCDebug::enable(&print);
-    //   TinyFOC_MOTOR_DEBUG("Monitor enabled!");
-    //   #endif
-}
-
 // Measure resistance and inductance of a motor
 int FOCMotor_characteriseMotor(FOCMotor *motor, FIXP voltage, FIXP correction_factor)
 {
@@ -319,33 +306,31 @@ void FOCMotor_monitor(FOCMotor *motor)
     if (!motor->monitor_downsample || motor->monitor_cnt++ < (motor->monitor_downsample - 1))
         return;
     motor->monitor_cnt = 0;
-    if (!motor->monitor_port)
-        return;
     bool printed = 0;
 
     if (motor->monitor_variables & _MON_TARGET)
     {
         if ((!printed) && motor->monitor_start_char)
-            motor->monitor_port->write(motor->monitor_start_char);
-        motor->monitor_port->print_f(motor->target, motor->monitor_decimals);
+            dbg_write(motor->monitor_start_char);
+        dbg_print_f(motor->target, motor->monitor_decimals);
         printed = true;
     }
     if (motor->monitor_variables & _MON_VOLT_Q)
     {
         if ((!printed) && motor->monitor_start_char)
-            motor->monitor_port->write(motor->monitor_start_char);
+            dbg_write(motor->monitor_start_char);
         else if (printed)
-            motor->monitor_port->write(motor->monitor_separator);
-        motor->monitor_port->print_f(motor->voltage.q, motor->monitor_decimals);
+            dbg_write(motor->monitor_separator);
+        dbg_print_f(motor->voltage.q, motor->monitor_decimals);
         printed = true;
     }
     if (motor->monitor_variables & _MON_VOLT_D)
     {
         if ((!printed) && motor->monitor_start_char)
-            motor->monitor_port->write(motor->monitor_start_char);
+            dbg_write(motor->monitor_start_char);
         else if (printed)
-            motor->monitor_port->write(motor->monitor_separator);
-        motor->monitor_port->print_f(motor->voltage.d, motor->monitor_decimals);
+            dbg_write(motor->monitor_separator);
+        dbg_print_f(motor->voltage.d, motor->monitor_decimals);
         printed = true;
     }
     // read currents if possible - even in voltage mode (if current_sense available)
@@ -362,19 +347,19 @@ void FOCMotor_monitor(FOCMotor *motor)
         if (motor->monitor_variables & _MON_CURR_Q)
         {
             if ((!printed) && motor->monitor_start_char)
-                motor->monitor_port->write(motor->monitor_start_char);
+                dbg_write(motor->monitor_start_char);
             else if (printed)
-                motor->monitor_port->write(motor->monitor_separator);
-            motor->monitor_port->print_f(c.q * 1000, motor->monitor_decimals); // mAmps
+                dbg_write(motor->monitor_separator);
+            dbg_print_f(c.q * 1000, motor->monitor_decimals); // mAmps
             printed = true;
         }
         if (motor->monitor_variables & _MON_CURR_D)
         {
             if ((!printed) && motor->monitor_start_char)
-                motor->monitor_port->write(motor->monitor_start_char);
+                dbg_write(motor->monitor_start_char);
             else if (printed)
-                motor->monitor_port->write(motor->monitor_separator);
-            motor->monitor_port->print_f(c.d * 1000, motor->monitor_decimals); // mAmps
+                dbg_write(motor->monitor_separator);
+            dbg_print_f(c.d * 1000, motor->monitor_decimals); // mAmps
             printed = true;
         }
     }
@@ -382,30 +367,30 @@ void FOCMotor_monitor(FOCMotor *motor)
     if (motor->monitor_variables & _MON_VEL)
     {
         if ((!printed) && motor->monitor_start_char)
-            motor->monitor_port->write(motor->monitor_start_char);
+            dbg_write(motor->monitor_start_char);
         else if (printed)
-            motor->monitor_port->write(motor->monitor_separator);
-        motor->monitor_port->print_f(motor->shaft_velocity, motor->monitor_decimals);
+            dbg_write(motor->monitor_separator);
+        dbg_print_f(motor->shaft_velocity, motor->monitor_decimals);
         printed = true;
     }
     if (motor->monitor_variables & _MON_ANGLE)
     {
         if ((!printed) && motor->monitor_start_char)
-            motor->monitor_port->write(motor->monitor_start_char);
+            dbg_write(motor->monitor_start_char);
         else if (printed)
-            motor->monitor_port->write(motor->monitor_separator);
-        motor->monitor_port->print_f(motor->shaft_angle, motor->monitor_decimals);
+            dbg_write(motor->monitor_separator);
+        dbg_print_f(motor->shaft_angle, motor->monitor_decimals);
         printed = true;
     }
     if (printed)
     {
         if (motor->monitor_end_char)
         {
-            motor->monitor_port->write(motor->monitor_end_char);
-            motor->monitor_port->newline();
+            dbg_write(motor->monitor_end_char);
+            dbg_newline();
         }
         else
-            motor->monitor_port->newline();
+            dbg_newline();
     }
 }
 
@@ -482,7 +467,7 @@ void FOCMotor_updateVelocityLimit(FOCMotor *motor, FIXP new_velocity_limit)
 {
     motor->velocity_limit = new_velocity_limit;
     if (motor->controller != MotionControlType_angle_nocascade)
-        motor->P_angle.limit = _abs(motor->velocity_limit); // if angle control but no velocity cascade, limit the angle controller by the velocity limit
+        motor->P_angle.output_max = _abs(motor->velocity_limit); // if angle control but no velocity cascade, limit the angle controller by the velocity limit
 }
 
 // Update limit values in controllers when changed
@@ -492,10 +477,10 @@ void FOCMotor_updateCurrentLimit(FOCMotor *motor, FIXP new_current_limit)
     if (motor->torque_controller != TorqueControlType_voltage)
     {
         // if current control
-        motor->PID_velocity.limit = new_current_limit;
+        motor->PID_velocity.output_max = new_current_limit;
         if (motor->controller == MotionControlType_angle_nocascade)
             // if angle control but no velocity cascade, limit the angle controller by the current limit
-            motor->P_angle.limit = new_current_limit;
+            motor->P_angle.output_max = new_current_limit;
     }
 }
 
@@ -504,15 +489,15 @@ void FOCMotor_updateCurrentLimit(FOCMotor *motor, FIXP new_current_limit)
 void FOCMotor_updateVoltageLimit(FOCMotor *motor, FIXP new_voltage_limit)
 {
     motor->voltage_limit = new_voltage_limit;
-    motor->PID_current_q.limit = new_voltage_limit;
-    motor->PID_current_d.limit = new_voltage_limit;
+    motor->PID_current_q.output_max = new_voltage_limit;
+    motor->PID_current_d.output_max = new_voltage_limit;
     if (motor->torque_controller == TorqueControlType_voltage)
     {
         // if voltage control
-        motor->PID_velocity.limit = new_voltage_limit;
+        motor->PID_velocity.output_max = new_voltage_limit;
         if (motor->controller == MotionControlType_angle_nocascade)
             // if angle control but no velocity cascade, limit the angle controller by the voltage limit
-            motor->P_angle.limit = new_voltage_limit;
+            motor->P_angle.output_max = new_voltage_limit;
     }
 }
 
@@ -1136,16 +1121,13 @@ int FOCMotor_absoluteZeroSearch(FOCMotor *motor)
     motor->velocity_limit = limit_vel;
     motor->voltage_limit = limit_volt;
     // check if the zero found
-    if (motor->monitor_port)
+    if (Sensor_needsSearch(motor->sensor))
     {
-        if (Sensor_needsSearch(motor->sensor))
-        {
-            TinyFOC_MOTOR_ERROR("Not found!");
-        }
-        else
-        {
-            TinyFOC_MOTOR_DEBUG("Success!");
-        }
+        TinyFOC_MOTOR_ERROR("Not found!");
+    }
+    else
+    {
+        TinyFOC_MOTOR_DEBUG("Success!");
     }
     return !Sensor_needsSearch(motor->sensor);
 }
@@ -1185,8 +1167,7 @@ void FOCMotor_load_default(FOCMotor *motor)
     motor->Ubeta = 0;
     motor->modulation_centered = 0;
 
-    // monitor_port
-    motor->monitor_port = NULL;
+    // monitor setup
     motor->monitor_downsample = DEF_MON_DOWNSMAPLE;
     motor->monitor_start_char = '\0';
     motor->monitor_end_char = '\0';
@@ -1226,7 +1207,7 @@ void FOCMotor_load_default(FOCMotor *motor)
 
 #if (MOTOR_TYPE == BLDC)
     // save pole pairs number
-    motor->pole_pairs = NOT_SET;
+    motor->pole_pairs = 1;
     // save phase resistance number
     motor->phase_resistance = NOT_SET;
     // save back emf constant KV = 1/KV

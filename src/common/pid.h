@@ -13,7 +13,7 @@ typedef struct s_PIDController
     FIXP I; //!< Integral gain 
     FIXP D; //!< Derivative gain 
     FIXP output_ramp; //!< Maximum speed of change of the output value
-    FIXP limit; //!< Maximum output value
+    FIXP output_max; //!< limit of output value
     uint32_t Ts; //!< Fixed sampling time in
 
     FIXP error_prev; //!< last tracking error value
@@ -36,7 +36,7 @@ typedef struct s_PIDController
  * @note Sampling time can be changed dynamically as well by modifying the 
  *       variable Ts in runtime.
  */
-void PIDController_init(PIDController *pid, FIXP P, FIXP I, FIXP D, FIXP ramp, FIXP limit, uint32_t sampling_time);
+void PIDController_init(PIDController *pid, FIXP P, FIXP I, FIXP D, FIXP ramp, FIXP output_max, uint32_t sampling_time);
 FIXP PIDController_update(PIDController *pid, FIXP error);
 void PIDController_reset(PIDController *pid);
 

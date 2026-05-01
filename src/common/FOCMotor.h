@@ -176,8 +176,6 @@ typedef struct s_FOCMotor
   FOCDriver *driver; //!< FOCDriver instance
 
   // monitoring functions
-  Print *monitor_port; //!< Serial terminal variable if provided
-
   unsigned int monitor_downsample; //!< show monitor outputs each monitor_downsample calls
   char monitor_start_char;         //!< monitor starting character
   char monitor_end_char;           //!< monitor outputs ending character
@@ -224,14 +222,6 @@ void FOCMotor_disable(struct s_FOCMotor *motor);
 
 /** Motor enable function */
 void FOCMotor_enable(struct s_FOCMotor *motor);
-
-/**
- * Function providing BLDCMotor class with the
- * Serial interface and enabling monitoring mode
- *
- * @param serial Monitoring Serial class reference
- */
-void FOCMotor_useMonitoring(struct s_FOCMotor *motor, Print *serial);
 
 /**
  * Utility function intended to be used with serial plotter to monitor motor variables
