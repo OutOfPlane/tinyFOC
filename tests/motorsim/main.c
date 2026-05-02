@@ -6,24 +6,29 @@
 #define M_PI 3.14159265358979323846f
 #define SQRT3 1.73205080756887729352f
 
-void nl(){
-    printf("\r\n");
+void dbg_write(char val)
+{
+	printf("%c", val);
 }
 
-void p(char * msg){
-    printf(msg);
+void dbg_newline(void)
+{
+	printf("\r\n");
 }
 
-void p_f(FIXP val, int digits){
-    printf("%.*f", digits, FIX_TO_FLOAT(val));
+void dbg_print(char* msg)
+{
+	printf(msg);
 }
 
-int r(char *val, int len){
-    return 0;
+void dbg_print_f(FIXP val, int digits)
+{
+	printf("%.*f", digits, FIX_TO_FLOAT(val));
 }
 
-void w(char c){
-    printf("%c", c);
+int dbg_read(char* val, int len)
+{
+	return 0;
 }
 
 typedef struct {
@@ -216,18 +221,8 @@ void CurrentSense_ll_readcurrents(void *params, FIXP *phA, FIXP *phB, FIXP *phC)
 
 int main(void)
 {
-    Print myprint = {
-        .newline = nl,
-        .print = p,
-        .print_f = p_f,
-        .read = r,
-        .write = w
-    };
-
     log_file = fopen("motor_data.bin", "wb"); // 'wb' = Write Binary
     log_file_sns = fopen("sensor_data.bin", "wb"); // 'wb' = Write Binary
-
-    TinyFOCDebug_enable(&myprint);
 
     printf("MyMicros: %lu\r\n", _micros());
     printf("MyMicros: %lu\r\n", _micros());
